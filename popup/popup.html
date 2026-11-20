@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarkFlow</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="card-container">
+
+    <!-- 顶部栏：双模式切换与引擎状态徽章 -->
+    <header class="card-header">
+      <div class="header-left">
+        <img src="../icons/icon32.png" alt="MarkFlow" class="logo">
+        <div class="segmented-tabs" role="tablist">
+          <button id="tabBtnSave" class="mode-tab active" role="tab" aria-selected="true" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span id="saveTabLabel" data-i18n="pop_tab_save">收藏</span>
+          </button>
+          <button id="tabBtnSearch" class="mode-tab" role="tab" aria-selected="false" type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span data-i18n="pop_tab_search">找书签</span>
+            <kbd class="mini-kbd">Tab</kbd>
+          </button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span id="engineBadge" class="badge badge-idle">
+          <span class="badge-dot"></span>
+          <span id="engineBadgeText" data-i18n="pop_badge_ready">准备就绪</span>
+        </span>
+        <button id="btnOptions" class="icon-btn" title="Settings" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 内联错误提示条 -->
+    <div id="popupErrorStrip" class="popup-error-strip hidden"></div>
+
+    <!-- 视图一：智能收藏与就地编辑 -->
+    <div id="viewSave" class="view-pane">
+      <main class="card-body">
+
+        <!-- 重复书签提示栏 -->
+        <div id="duplicateBanner" class="dup-banner hidden">
+          <div class="dup-info">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            <span class="dup-text">
+              <span data-i18n="pop_dup_prefix">已收藏于</span>
+              <strong id="dupFolderLabel"></strong>
+            </span>
+          </div>
+          <div class="dup-actions">
+            <button id="btnReanalyzeAI" class="dup-btn" type="button" data-i18n="pop_btn_reanalyze">AI 重整</button>
+            <button id="btnDeleteExisting" class="dup-btn dup-btn-danger" type="button" data-i18n="pop_btn_remove">移除</button>
+          </div>
+        </div>
+
+        <!-- 首次使用 AI 配置引导条 -->
+        <div id="aiOnboardingStrip" class="onboarding-strip hidden">
+          <span class="onboarding-text" data-i18n="pop_onboarding_text">配置 AI 模型即可自动精准归类与命名</span>
+          <button id="btnGoSetupAI" class="onboarding-cta" type="button" data-i18n="pop_onboarding_cta">去配置 →</button>
+        </div>
+
+        <!-- 站点身份预览卡片 -->
+        <div class="site-identity-card">
+          <div class="site-icon-box">
+            <img id="siteFavicon" src="../icons/icon16.png" class="favicon" alt="">
+          </div>
+          <div class="site-meta">
+            <div class="site-domain-row">
+              <span id="siteDomainPreview" class="site-domain truncate"></span>
+              <span id="deepContextBadge" class="context-chip hidden" data-i18n="pop_deep_ctx_chip">深度语义</span>
+            </div>
+            <div id="urlPreview" class="url-preview truncate"></div>
+          </div>
+        </div>
+
+        <!-- 书签标题与一键 AI 命名 -->
+        <div class="field-group">
+          <div class="field-header">
+            <label for="inputTitle" data-i18n="pop_label_title">书签标题</label>
+            <div class="title-header-right">
+              <span id="titleOriginBadge" class="sub-text"></span>
+              <button id="btnAiTitlePolish" class="inline-ai-btn hidden" type="button">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+                </svg>
+                <span data-i18n="pop_btn_ai_title">AI 命名</span>
+              </button>
+            </div>
+          </div>
+          <div class="input-wrapper">
+            <input type="text" id="inputTitle" data-i18n-placeholder="pop_title_placeholder" placeholder="正在提取网页标题..." autocomplete="off">
+          </div>
+        </div>
+
+        <!-- 可搜索目录树下拉框与备选胶囊 -->
+        <div class="field-group folder-field-group">
+          <div class="field-header">
+            <label id="folderComboLabel" data-i18n="pop_label_folder">目标文件夹</label>
+            <span id="folderMatchedReason" class="sub-text reason-text"></span>
+          </div>
+
+          <div class="combobox-container" id="folderCombobox">
+            <button id="folderComboTrigger" class="combo-trigger" type="button" role="combobox" aria-expanded="false" aria-labelledby="folderComboLabel">
+              <span id="selectedFolderDot" class="cat-dot"></span>
+              <span id="selectedFolderText" class="combo-selected-text" data-i18n="pop_folder_loading">正在读取书签目录...</span>
+              <svg class="combo-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            <div id="folderComboDropdown" class="combo-dropdown hidden">
+              <div class="combo-search-bar">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="folderSearchInput" data-i18n-placeholder="pop_folder_search_placeholder" placeholder="输入名称快速筛选目录..." autocomplete="off">
+              </div>
+              <div id="folderOptionsList" class="combo-options-list" role="listbox"></div>
+            </div>
+          </div>
+
+          <!-- 备选目录快捷切换胶囊 -->
+          <div id="candidatePillsRow" class="candidate-pills-row hidden">
+            <span class="pills-label" data-i18n="pop_alt_label">备选:</span>
+            <div id="candidatePillsList" class="pills-list"></div>
+          </div>
+
+          <!-- 建议新建二级目录条 -->
+          <div id="subfolderSuggestionBox" class="suggestion-box hidden">
+            <div class="suggestion-content">
+              <svg class="suggestion-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                <line x1="12" y1="11" x2="12" y2="17"></line>
+                <line x1="9" y1="14" x2="15" y2="14"></line>
+              </svg>
+              <span class="suggestion-text">
+                <span data-i18n="pop_suggest_sub_prefix">建议二级分类:</span>
+                <strong id="suggestedSubfolderName"></strong>
+              </span>
+            </div>
+            <button id="btnAcceptSubfolder" class="chip-btn" type="button">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span data-i18n="pop_btn_accept_sub">采用并新建</span>
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- 自动保存倒计时进度条 -->
+      <div id="countdownContainer" class="countdown-bar-container" style="display: none;">
+        <div id="countdownBar" class="countdown-bar"></div>
+      </div>
+
+      <!-- 底部操作栏 -->
+      <footer class="card-footer">
+        <div class="countdown-text" id="countdownLabel" data-i18n="pop_hint_enter_save">按 Enter 键立即保存</div>
+        <div class="button-group">
+          <button id="btnCancel" class="btn btn-secondary" type="button" data-i18n="pop_btn_cancel">取消 (Esc)</button>
+          <button id="btnSave" class="btn btn-primary" type="button" data-i18n="pop_btn_save">立即保存 ↵</button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 视图二：极速书签检索启动器 -->
+    <div id="viewSearch" class="view-pane hidden">
+      <div class="launcher-search-box">
+        <svg class="launcher-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="bookmarkSearchInput" data-i18n-placeholder="pop_search_placeholder" placeholder="搜索书签名称、域名或目录..." autocomplete="off">
+        <span id="bookmarkCountBadge" class="count-pill">0</span>
+      </div>
+
+      <div id="searchSectionLabel" class="launcher-section-label" data-i18n="pop_search_recent">最近收藏</div>
+
+      <div id="searchResultsList" class="launcher-results-list" role="listbox"></div>
+
+      <footer class="launcher-footer">
+        <span><kbd>↑↓</kbd> <span data-i18n="pop_footer_select">选择</span></span>
+        <span><kbd>↵</kbd> <span data-i18n="pop_footer_open">打开</span></span>
+        <span><kbd>Ctrl+↵</kbd> <span data-i18n="pop_footer_bg_open">后台打开</span></span>
+        <span><kbd>Tab</kbd> <span data-i18n="pop_footer_back">返回收藏</span></span>
+      </footer>
+    </div>
+
+    <!-- 操作成功浮层 -->
+    <div id="successOverlay" class="success-overlay hidden">
+      <div class="success-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <div class="success-title" id="successTitle" data-i18n="pop_success_saved">已成功收藏</div>
+      <div class="success-desc" id="successDesc"></div>
+      <div class="success-actions">
+        <button id="btnUndo" class="link-btn" type="button" data-i18n="pop_btn_undo">撤销操作</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 多语言运行时与 7 国语言包 -->
+  <script src="../shared/i18n.js"></script>
+  <script src="../shared/locales/zh_CN.js"></script>
+  <script src="../shared/locales/zh_TW.js"></script>
+  <script src="../shared/locales/en.js"></script>
+  <script src="../shared/locales/ja.js"></script>
+  <script src="../shared/locales/ko.js"></script>
+  <script src="../shared/locales/de.js"></script>
+  <script src="../shared/locales/es.js"></script>
+
+  <!-- 核心引擎子模块 -->
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/utils.js"></script>
+  <script src="../shared/tree.js"></script>
+  <script src="../shared/rules.js"></script>
+  <script src="../shared/sorter.js"></script>
+  <script src="../shared/llm.js"></script>
+  <script src="../shared/classifier.js"></script>
+
+  <script src="popup.js"></script>
+</body>
+</html>

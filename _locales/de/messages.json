@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — Intelligente Lesezeichen-Verwaltung & Schnellsuche"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "Lokale Regel-Engine und KI-Klassifizierung zum automatischen Sortieren, Bereinigen und schnellen Durchsuchen Ihrer Lesezeichen."
+  },
+  "actionTitle": {
+    "message": "MarkFlow Lesezeichen speichern & suchen (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "MarkFlow Panel zum Speichern und Suchen öffnen"
+  }
+}

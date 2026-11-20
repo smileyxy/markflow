@@ -1,0 +1,134 @@
+name: Bump Version & Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "版本号递增类型"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - custom
+      custom_version:
+        description: "自定义版本号（仅在 bump_type=custom 时生效，例如 1.2.0）"
+        required: false
+        default: ""
+        type: string
+      release_notes:
+        description: "本次更新摘要（将自动写入 CHANGELOG.md，可留空）"
+        required: false
+        default: ""
+        type: string
+      publish_cws:
+        description: "同步上传并提交审核至 Chrome Web Store"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump Version & Create Tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.bump_files.outputs.tag_name }}
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compute & update version across project files
+        id: bump_files
+        env:
+          BUMP_TYPE: ${{ inputs.bump_type }}
+          CUSTOM_VER: ${{ inputs.custom_version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+            const cur = manifest.version.split(".").map(Number);
+            if (cur.length !== 3 || cur.some(Number.isNaN)) {
+              throw new Error("Invalid current version in manifest.json: " + manifest.version);
+            }
+
+            const bumpType = process.env.BUMP_TYPE;
+            const customVer = (process.env.CUSTOM_VER || "").trim().replace(/^v/, "");
+            let next;
+
+            if (bumpType === "custom") {
+              if (!/^\d+\.\d+\.\d+$/.test(customVer)) {
+                throw new Error("自定义版本号格式错误，需为 X.Y.Z（例如 1.2.0）");
+              }
+              next = customVer;
+            } else if (bumpType === "major") {
+              next = `${cur[0] + 1}.0.0`;
+            } else if (bumpType === "minor") {
+              next = `${cur[0]}.${cur[1] + 1}.0`;
+            } else {
+              next = `${cur[0]}.${cur[1]}.${cur[2] + 1}`;
+            }
+
+            // 1. 更新 manifest.json
+            manifest.version = next;
+            fs.writeFileSync("manifest.json", JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+            // 2. 更新 options/options.html 侧边栏版本号显示
+            const optPath = "options/options.html";
+            let optHtml = fs.readFileSync(optPath, "utf8");
+            optHtml = optHtml.replace(
+              /(<span class="brand-version">)v\d+\.\d+\.\d+(<\/span>)/,
+              `$1v${next}$2`
+            );
+            fs.writeFileSync(optPath, optHtml, "utf8");
+
+            // 3. 若 CHANGELOG.md 尚未包含该版本，自动插入新版本段落
+            const clPath = "CHANGELOG.md";
+            if (fs.existsSync(clPath)) {
+              let cl = fs.readFileSync(clPath, "utf8");
+              if (!cl.includes(`## [${next}]`)) {
+                const today = new Date().toISOString().slice(0, 10);
+                const noteText = (process.env.RELEASE_NOTES || "").trim() || "常规功能优化与稳定性改进。";
+                const entry = `## [${next}] - ${today}\n\n### Changed\n- ${noteText}\n\n`;
+                cl = cl.replace(/(?=^## \[)/m, entry);
+                fs.writeFileSync(clPath, cl, "utf8");
+              }
+            }
+
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `new_version=${next}\ntag_name=v${next}\n`);
+            console.log(`Bumped version: ${cur.join(".")} -> ${next}`);
+          '
+
+      - name: Commit version bump and push tag
+        run: |
+          TAG="${{ steps.bump_files.outputs.tag_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json options/options.html CHANGELOG.md
+          git commit -m "chore(release): ${TAG}"
+          git tag -a "${TAG}" -m "MarkFlow AI ${TAG}"
+          git push origin main
+          git push origin "${TAG}"
+
+  publish:
+    name: Trigger Release & Chrome Web Store Sync
+    needs: bump
+    uses: ./.github/workflows/release.yml
+    with:
+      tag_name: ${{ needs.bump.outputs.tag_name }}
+      publish_cws: ${{ inputs.publish_cws }}
+    secrets: inherit

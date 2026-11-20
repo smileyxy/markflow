@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — スマートブックマーク自動整理・高速検索"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "ローカルルール＋AIセマンティック分析でブックマークを自動分類・タイトル整形。重複検知と高速検索ランチャー搭載。"
+  },
+  "actionTitle": {
+    "message": "MarkFlow スマート保存・検索 (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "MarkFlow スマート保存・高速検索パネルを開く"
+  }
+}

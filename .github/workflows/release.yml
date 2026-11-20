@@ -1,0 +1,178 @@
+name: Release & Sync Chrome Web Store
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "目标版本标签（例如 v1.0.1）"
+        required: true
+        type: string
+      publish_cws:
+        description: "配置 Secrets 后自动上传并提交至 Chrome Web Store"
+        required: false
+        default: true
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "要发布的版本标签（留空则读取 manifest.json 版本）"
+        required: false
+        default: ""
+        type: string
+      publish_cws:
+        description: "同步上传并提交审核至 Chrome Web Store"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Release & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve target ref
+        id: resolve_ref
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            TAG="${{ inputs.tag_name }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG=""
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve_ref.outputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate manifest version and JavaScript syntax
+        id: meta
+        run: |
+          VERSION=$(node -e 'console.log(JSON.parse(require("fs").readFileSync("manifest.json","utf8")).version)')
+          TAG="${{ steps.resolve_ref.outputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="v${VERSION}"
+          fi
+          EXPECTED_TAG="v${VERSION}"
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Tag (${TAG}) 与 manifest.json 版本号 (${EXPECTED_TAG}) 不一致！"
+            exit 1
+          fi
+
+          find background shared popup options -name "*.js" -print0 | xargs -0 -n1 node --check
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=markflow-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Build clean Chrome extension package
+        run: |
+          mkdir -p dist
+          zip -r "dist/${{ steps.meta.outputs.zip_name }}" \
+            manifest.json \
+            _locales \
+            icons \
+            background \
+            shared \
+            popup \
+            options \
+            -x "*.DS_Store" "*Thumbs.db" "*desktop.ini"
+          ls -lh "dist/${{ steps.meta.outputs.zip_name }}"
+
+      - name: Extract changelog notes
+        id: notes
+        run: |
+          node -e '
+            const fs = require("fs");
+            const ver = process.env.VER;
+            const md = fs.existsSync("CHANGELOG.md") ? fs.readFileSync("CHANGELOG.md", "utf8") : "";
+            const escaped = ver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const re = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|$)`, "m");
+            const m = md.match(re);
+            const body = m ? m[1].trim() : `MarkFlow AI v${ver} 正式发布。`;
+            fs.writeFileSync("release-notes.md", body + "\n", "utf8");
+          '
+        env:
+          VER: ${{ steps.meta.outputs.version }}
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          ZIP_PATH="dist/${{ steps.meta.outputs.zip_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP_PATH" --clobber
+            gh release edit "$TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "$ZIP_PATH" \
+              --title "MarkFlow AI ${TAG}" \
+              --notes-file release-notes.md
+          fi
+
+      - name: Upload & publish to Chrome Web Store
+        id: cws
+        if: ${{ github.event_name == 'push' || inputs.publish_cws == true }}
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          ZIP_PATH: dist/${{ steps.meta.outputs.zip_name }}
+        run: |
+          if [ -z "$CWS_EXTENSION_ID" ] || [ -z "$CWS_CLIENT_ID" ] || [ -z "$CWS_CLIENT_SECRET" ] || [ -z "$CWS_REFRESH_TOKEN" ]; then
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Chrome Web Store 自动同步已跳过"
+              echo "未检测到完整的商店 API Secrets（\`CWS_EXTENSION_ID\` / \`CWS_CLIENT_ID\` / \`CWS_CLIENT_SECRET\` / \`CWS_REFRESH_TOKEN\`）。"
+              echo "GitHub Release（\`${{ steps.meta.outputs.zip_name }}\`）已正常发布；配置好 Secrets 后可随时手动重新运行本工作流完成商店自动提交。"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          ACCESS_TOKEN=$(curl -sS -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=${CWS_CLIENT_ID}" \
+            -d "client_secret=${CWS_CLIENT_SECRET}" \
+            -d "refresh_token=${CWS_REFRESH_TOKEN}" \
+            -d "grant_type=refresh_token" | node -e 'const d = JSON.parse(require("fs").readFileSync(0,"utf8")); if (!d.access_token) { console.error(d); process.exit(1); } console.log(d.access_token);')
+
+          UPLOAD_RES=$(curl -sS -X PUT \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -T "${ZIP_PATH}" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}")
+
+          echo "Upload response: ${UPLOAD_RES}"
+          echo "${UPLOAD_RES}" | node -e 'const d = JSON.parse(require("fs").readFileSync(0,"utf8")); if (d.uploadState !== "SUCCESS") { console.error("Chrome Web Store upload failed:", d); process.exit(1); }'
+
+          PUBLISH_RES=$(curl -sS -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${CWS_EXTENSION_ID}/publish?publishTarget=default")
+
+          echo "Publish response: ${PUBLISH_RES}"
+          echo "${PUBLISH_RES}" | node -e 'const d = JSON.parse(require("fs").readFileSync(0,"utf8")); const ok = Array.isArray(d.status) && d.status.includes("OK"); if (!ok) { console.error("Chrome Web Store publish failed:", d); process.exit(1); }'
+
+          echo "status=published" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Chrome Web Store 自动同步成功"
+            echo "- 版本：\`${{ steps.meta.outputs.tag }}\`"
+            echo "- 扩展 ID：\`${CWS_EXTENSION_ID}\`"
+            echo "- 状态：已自动上传并提交 Chrome 商店审核"
+          } >> "$GITHUB_STEP_SUMMARY"

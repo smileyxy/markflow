@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — Smart Bookmark Organizer & Launcher"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "Instant rule engine + AI semantic bookmark classifier, title cleaner, duplicate detector, and Raycast-style bookmark launcher."
+  },
+  "actionTitle": {
+    "message": "MarkFlow Smart Bookmark & Search (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "Open MarkFlow Smart Save & Quick Search Panel"
+  }
+}

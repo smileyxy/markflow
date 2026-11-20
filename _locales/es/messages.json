@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — Organizador y Buscador Inteligente de Marcadores"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "Motor de reglas locales y clasificación semántica con IA para ordenar, limpiar títulos y buscar marcadores al instante."
+  },
+  "actionTitle": {
+    "message": "MarkFlow Guardar y Buscar Marcadores (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "Abrir el panel de guardado y búsqueda rápida de MarkFlow"
+  }
+}

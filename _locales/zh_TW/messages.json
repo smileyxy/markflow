@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — 智慧書籤自動分類、整理與極速檢索"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "本地規則與 AI 語意雙引擎，精準歸類書籤、精簡標題、自動去重與極速書籤檢索。"
+  },
+  "actionTitle": {
+    "message": "MarkFlow 智慧收藏與檢索 (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "開啟 MarkFlow 智慧收藏與極速檢索面板"
+  }
+}

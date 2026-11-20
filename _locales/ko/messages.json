@@ -1,0 +1,17 @@
+{
+  "extName": {
+    "message": "MarkFlow AI — 스마트 북마크 자동 분류 및 빠른 검색"
+  },
+  "extShortName": {
+    "message": "MarkFlow"
+  },
+  "extDesc": {
+    "message": "로컬 규칙 엔진과 AI 시맨틱 분류로 북마크를 자동 정리하고 제목을 다듬는 초고속 북마크 런처."
+  },
+  "actionTitle": {
+    "message": "MarkFlow 스마트 저장 및 검색 (Alt+B)"
+  },
+  "commandDesc": {
+    "message": "MarkFlow 스마트 저장 및 빠른 검색 패널 열기"
+  }
+}
