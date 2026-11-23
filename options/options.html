@@ -341,7 +341,7 @@
               </button>
               <button class="preset-btn" data-provider="gemini" type="button">
                 <span class="preset-name">Google Gemini</span>
-                <span class="preset-tag">Gemini 3.8 / 3.5 Flash</span>
+                <span class="preset-tag">Gemini API / Vertex AI</span>
               </button>
               <button class="preset-btn" data-provider="deepseek" type="button">
                 <span class="preset-name">DeepSeek</span>
@@ -366,6 +366,10 @@
             <label for="inputBaseUrl" class="form-label" data-i18n="ai_base_url_label">API 接口地址 (Base URL)</label>
             <input type="text" id="inputBaseUrl" class="form-input font-mono" placeholder="https://api.siliconflow.cn/v1">
             <span id="baseUrlHint" class="form-hint" data-i18n="ai_base_url_hint">需兼容 OpenAI 标准的 /chat/completions 规范</span>
+            <div id="endpointQuickChipsContainer" class="quick-models-bar hidden">
+              <span class="quick-models-label" data-i18n="ai_quick_endpoints_label">接口模式：</span>
+              <div id="endpointQuickChips" class="quick-models-list"></div>
+            </div>
           </div>
 
           <div class="form-group">

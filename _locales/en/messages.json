@@ -6,7 +6,7 @@
     "message": "MarkFlow"
   },
   "extDesc": {
-    "message": "Instant rule engine + AI semantic bookmark classifier, title cleaner, duplicate detector, and Raycast-style bookmark launcher."
+    "message": "Instant rule engine + AI semantic bookmark classifier, title cleaner, duplicate detector, and instant keyboard bookmark launcher."
   },
   "actionTitle": {
     "message": "MarkFlow Smart Bookmark & Search (Alt+B)"

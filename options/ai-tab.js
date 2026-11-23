@@ -59,6 +59,7 @@
       });
     });
 
+    inputBaseUrl.addEventListener("input", () => syncActiveEndpointChip(inputBaseUrl.value.trim()));
     inputModel.addEventListener("input", () => syncActiveModelChip(inputModel.value.trim()));
 
     document.getElementById("btnToggleApiKey").addEventListener("click", () => {
@@ -141,7 +142,12 @@
       try {
         const reply = await MarkFlowEngine.testAIConnection({ provider, baseUrl, apiKey, model });
         const proto = MarkFlowEngine.detectProtocol(provider, baseUrl);
-        const protoTag = proto === "gemini" ? "Gemini Native" : "OpenAI Compatible";
+        const protoTag =
+          proto === "vertex"
+            ? "Vertex AI"
+            : proto === "gemini"
+              ? "Gemini Native"
+              : "OpenAI Compatible";
         showToast(t("ai_toast_test_ok", { proto: protoTag, reply: String(reply).slice(0, 32) }));
       } catch (err) {
         showToast(t("ai_toast_test_err", { msg: err.message }), true);
@@ -159,6 +165,8 @@
     const inputApiKey = document.getElementById("inputApiKey");
     const inputModel = document.getElementById("inputModel");
     const baseUrlHint = document.getElementById("baseUrlHint");
+    const epContainer = document.getElementById("endpointQuickChipsContainer");
+    const epList = document.getElementById("endpointQuickChips");
     const chipsContainer = document.getElementById("modelQuickChipsContainer");
     const chipsList = document.getElementById("modelQuickChips");
 
@@ -170,6 +178,33 @@
       const hintKey = preset.urlHintKey || "ai_base_url_hint";
       baseUrlHint.setAttribute("data-i18n", hintKey);
       baseUrlHint.textContent = t(hintKey);
+    }
+
+    if (epContainer && epList) {
+      epList.innerHTML = "";
+      if (preset.quickEndpoints && preset.quickEndpoints.length > 0) {
+        preset.quickEndpoints.forEach(ep => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "model-chip-btn";
+          chip.textContent = ep.label;
+          chip.dataset.url = ep.url;
+          chip.addEventListener("click", () => {
+            inputBaseUrl.value = ep.url;
+            syncActiveEndpointChip(ep.url);
+            const phIdx = ep.url.indexOf("PROJECT_ID");
+            if (phIdx !== -1) {
+              inputBaseUrl.focus();
+              inputBaseUrl.setSelectionRange(phIdx, phIdx + "PROJECT_ID".length);
+            }
+          });
+          epList.appendChild(chip);
+        });
+        syncActiveEndpointChip(inputBaseUrl.value.trim());
+        epContainer.classList.remove("hidden");
+      } else {
+        epContainer.classList.add("hidden");
+      }
     }
 
     chipsList.innerHTML = "";
@@ -189,6 +224,18 @@
     } else {
       chipsContainer.classList.add("hidden");
     }
+  }
+
+  function syncActiveEndpointChip(currentUrl) {
+    const normalized = (currentUrl || "").trim().replace(/\/+$/, "");
+    document.querySelectorAll("#endpointQuickChips .model-chip-btn").forEach(btn => {
+      const targetUrl = (btn.dataset.url || "").replace(/\/+$/, "");
+      let isMatch = normalized === targetUrl;
+      if (!isMatch && targetUrl.includes("PROJECT_ID")) {
+        isMatch = /\/projects\/[^/]+\/locations\/[^/]+/i.test(normalized);
+      }
+      btn.classList.toggle("active", isMatch);
+    });
   }
 
   function renderFetchedModelsList(filterText) {

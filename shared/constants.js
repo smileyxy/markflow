@@ -28,13 +28,27 @@
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       apiKey: "",
       model: "gemini-3.8-flash",
+      quickEndpoints: [
+        {
+          label: "Gemini API",
+          url: "https://generativelanguage.googleapis.com/v1beta"
+        },
+        {
+          label: "Vertex AI Express",
+          url: "https://aiplatform.googleapis.com/v1/publishers/google"
+        },
+        {
+          label: "Vertex AI Project",
+          url: "https://aiplatform.googleapis.com/v1/projects/PROJECT_ID/locations/global/publishers/google"
+        }
+      ],
       quickModels: [
         "gemini-3.8-flash",
         "gemini-3.5-flash-lite",
         "gemini-3.5-flash",
         "gemini-3.1-pro"
       ],
-      keyPlaceholder: "AIzaSy...",
+      keyPlaceholder: "AIzaSy... / AQ.... / ya29....",
       urlHintKey: "ai_gemini_url_hint"
     },
     deepseek: {
