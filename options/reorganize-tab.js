@@ -42,6 +42,145 @@
     syncReorgStartButtonLabel();
   }
 
+  function getSelectedSortRule() {
+    const sel = document.getElementById("selReorgSortRule");
+    return (sel && sel.value) || (appState.preferences && appState.preferences.reorgSortRule) || "smart";
+  }
+
+  /** 判断单条预览项是否包含实质变动（标题修改、目标目录变更或同目录内排序移位） */
+  function isItemChanged(item) {
+    if (!item) return false;
+    return (
+      (item.cleanTitle && item.cleanTitle !== item.originalTitle) ||
+      String(item.targetFolderId) !== String(item.currentFolderId) ||
+      Boolean(item.orderChanged)
+    );
+  }
+
+  /**
+   * 标记每个目标目录内的书签是否发生相对位置变化：
+   * 比较调整后同目录内的书签顺序与原书签顺序，仅对实际发生移位的条目或迁入新条目置为 orderChanged=true。
+   */
+  function markOrderChangedFlags(items) {
+    if (!Array.isArray(items)) return;
+    items.forEach(it => {
+      it.orderChanged = false;
+    });
+
+    if (appState.activeReorgMode === "rebuild") {
+      items.forEach(it => {
+        if (String(it.targetFolderId) !== String(it.currentFolderId)) {
+          it.orderChanged = false;
+        }
+      });
+      return;
+    }
+
+    const shouldSort =
+      appState.activeReorgMode === "sort_only" ||
+      (document.getElementById("chkSortInFolders") &&
+        document.getElementById("chkSortInFolders").checked);
+
+    const byTarget = new Map();
+    for (const item of items) {
+      if (item.ignored) continue;
+      const destId = String(item.targetFolderId || item.currentFolderId || "1");
+      if (!byTarget.has(destId)) byTarget.set(destId, []);
+      byTarget.get(destId).push(item);
+    }
+
+    for (const [destId, bucket] of byTarget.entries()) {
+      const stayed = bucket.filter(it => String(it.currentFolderId) === destId);
+      const hasIncoming = stayed.length < bucket.length;
+
+      if (!shouldSort && !hasIncoming) continue;
+
+      const origOrdered = [...stayed].sort((a, b) => {
+        const idxDiff = (a.origIndex ?? 0) - (b.origIndex ?? 0);
+        return idxDiff !== 0 ? idxDiff : (a._origOrderIdx ?? 0) - (b._origOrderIdx ?? 0);
+      });
+      const origRankMap = new Map(origOrdered.map((it, idx) => [String(it.id), idx]));
+
+      bucket.forEach((it, newIdx) => {
+        if (String(it.currentFolderId) !== destId) {
+          it.orderChanged = false;
+          return;
+        }
+        if (hasIncoming) {
+          // 若同目录前部条目仍紧跟在原位且排在新迁入条目之前，则视具体相对序判定
+          if (origRankMap.get(String(it.id)) !== newIdx) {
+            it.orderChanged = true;
+          }
+        } else if (origRankMap.get(String(it.id)) !== newIdx) {
+          it.orderChanged = true;
+        }
+      });
+    }
+  }
+
+  function formatApproxTokens(count) {
+    if (count >= 1000) {
+      return `~${(count / 1000).toFixed(1)}K`;
+    }
+    return `~${count}`;
+  }
+
+  /** 根据当前整理模式、书签范围与本地规则命中率计算并渲染预计消耗 Token */
+  async function updateReorgTokenEstimate() {
+    const el = document.getElementById("reorgTokenEstimate");
+    if (!el || typeof chrome === "undefined" || !chrome.bookmarks) return;
+
+    try {
+      const tree = await chrome.bookmarks.getTree();
+      let scopedBookmarks = [];
+      if (appState.reorgMode === "rebuild") {
+        scopedBookmarks = collectUnlockedBookmarks(tree[0].children || [], appState.lockedL1Ids);
+      } else {
+        const isAll = document.getElementById("radioScopeAll").checked;
+        const targetFolderId = document.getElementById("selReorgFolder").value;
+        let rootNodes = [];
+        if (isAll) {
+          rootNodes = tree[0].children || [];
+        } else {
+          const found = findNodeById(tree[0], targetFolderId);
+          if (found) rootNodes = [found];
+        }
+        scopedBookmarks = collectBookmarks(rootNodes);
+      }
+
+      const est = MarkFlowEngine.estimateReorganizeTokens({
+        mode: appState.reorgMode,
+        bookmarks: scopedBookmarks,
+        rules: appState.rules,
+        treeAnalysis: appState.treeAnalysis,
+        aiConfig: appState.aiConfig,
+        preferences: appState.preferences
+      });
+
+      el.classList.remove("is-free");
+      if (est.totalBookmarks === 0) {
+        el.textContent = t("reorg_est_empty");
+      } else if (!est.aiEnabled && appState.reorgMode !== "rebuild") {
+        el.classList.add("is-free");
+        el.textContent = t("reorg_est_zero_ai", { total: est.totalBookmarks });
+      } else if (est.isLocalFree) {
+        el.classList.add("is-free");
+        el.textContent = t("reorg_est_tokens_local", {
+          tokens: formatApproxTokens(est.estimatedTokens),
+          batches: est.batchCount
+        });
+      } else {
+        el.textContent = t("reorg_est_tokens", {
+          provider: est.providerLabel,
+          tokens: formatApproxTokens(est.estimatedTokens),
+          batches: est.batchCount,
+          aiCount: est.aiCount,
+          ruleCount: est.ruleMatchedCount
+        });
+      }
+    } catch (e) {}
+  }
+
   function initReorganizeTab() {
     const radioModeExisting = document.getElementById("radioModeExisting");
     const radioModeRebuild = document.getElementById("radioModeRebuild");
@@ -54,6 +193,30 @@
     const radioAll = document.getElementById("radioScopeAll");
     const radioFolder = document.getElementById("radioScopeFolder");
     const folderGroup = document.getElementById("reorgFolderSelectGroup");
+    const selFolder = document.getElementById("selReorgFolder");
+
+    const selSortRule = document.getElementById("selReorgSortRule");
+    if (selSortRule) {
+      selSortRule.value = (appState.preferences && appState.preferences.reorgSortRule) || "smart";
+      selSortRule.addEventListener("change", async () => {
+        appState.preferences.reorgSortRule = selSortRule.value;
+        await chrome.storage.local.set({ preferences: appState.preferences });
+        const previewBox = document.getElementById("reorgPreviewContainer");
+        if (previewBox && !previewBox.classList.contains("hidden") && appState.reorgItems.length > 0) {
+          sortPreviewItemsByDestinationFolder();
+          renderReorgPreviewTable();
+        }
+      });
+    }
+
+    const chkChangedOnly = document.getElementById("chkPreviewChangedOnly");
+    if (chkChangedOnly) {
+      chkChangedOnly.checked = appState.previewChangedOnly !== false;
+      chkChangedOnly.addEventListener("change", () => {
+        appState.previewChangedOnly = chkChangedOnly.checked;
+        renderReorgPreviewTable();
+      });
+    }
 
     const selIconStyle = document.getElementById("selRebuildIconStyle");
     if (appState.treeAnalysis && !appState.treeAnalysis.styleProfile.mainUsesEmoji) {
@@ -74,16 +237,24 @@
 
       if (isRebuild) renderLockedFoldersChecklist();
       setStartButtonDemoted(false);
+      updateReorgTokenEstimate();
     };
 
     radioModeExisting.addEventListener("change", onModeSwitch);
     radioModeRebuild.addEventListener("change", onModeSwitch);
 
-    radioAll.addEventListener("change", () => folderGroup.classList.add("hidden"));
+    radioAll.addEventListener("change", () => {
+      folderGroup.classList.add("hidden");
+      updateReorgTokenEstimate();
+    });
     radioFolder.addEventListener("change", () => {
       folderGroup.classList.remove("hidden");
       populateReorgFolderSelect();
+      updateReorgTokenEstimate();
     });
+    if (selFolder) {
+      selFolder.addEventListener("change", updateReorgTokenEstimate);
+    }
 
     const btnManualBackup = document.getElementById("btnManualBackup");
     if (btnManualBackup) {
@@ -115,6 +286,7 @@
 
     populateReorgFolderSelect();
     renderLockedFoldersChecklist();
+    updateReorgTokenEstimate();
   }
 
   function syncReorgStartButtonLabel() {
@@ -171,6 +343,7 @@
         if (chk.checked) appState.lockedL1Ids.add(f.id);
         else appState.lockedL1Ids.delete(f.id);
         label.classList.toggle("is-locked", chk.checked);
+        updateReorgTokenEstimate();
       });
 
       const span = document.createElement("span");
@@ -210,11 +383,14 @@
     appState.previewCategoryFilter = "ALL";
     document.getElementById("reorgBlueprintContainer").classList.add("hidden");
 
+    const sortRule = getSelectedSortRule();
     const byFolder = new Map();
     rawBookmarks.forEach((bm, idx) => {
       const funcGroup = MarkFlowEngine.inferLocalFuncGroup(bm.url, bm.title);
       const entry = {
         _origOrderIdx: idx,
+        origIndex: bm.origIndex ?? 0,
+        dateAdded: bm.dateAdded || 0,
         id: bm.id,
         originalTitle: bm.title,
         url: bm.url,
@@ -225,7 +401,8 @@
         targetFolderName: bm.parentTitle,
         funcGroup,
         reason: t("reorg_reason_sort_only"),
-        ignored: false
+        ignored: false,
+        orderChanged: false
       };
       if (!byFolder.has(bm.parentId)) byFolder.set(bm.parentId, []);
       byFolder.get(bm.parentId).push(entry);
@@ -233,9 +410,10 @@
 
     const sortedAll = [];
     for (const [, folderItems] of byFolder.entries()) {
-      sortedAll.push(...MarkFlowEngine.sortFolderBookmarksByPriority(folderItems));
+      sortedAll.push(...MarkFlowEngine.sortFolderBookmarksByPriority(folderItems, sortRule));
     }
 
+    markOrderChangedFlags(sortedAll);
     appState.reorgItems = sortedAll;
     renderReorgPreviewTable();
     const previewBox = document.getElementById("reorgPreviewContainer");
@@ -292,6 +470,8 @@
 
     if (document.getElementById("chkSortInFolders").checked) {
       sortPreviewItemsByDestinationFolder();
+    } else {
+      markOrderChangedFlags(appState.reorgItems);
     }
 
     btnStart.disabled = false;
@@ -488,10 +668,20 @@
   function addNewBlueprintCategory() {
     const iconStyle = document.getElementById("selRebuildIconStyle").value || "emoji";
     const baseName = t("reorg_bp_new_l1");
+    let catTitle = baseName;
+    if (iconStyle === "emoji" || iconStyle === "emoji_both") {
+      catTitle = `📁 ${baseName}`;
+    } else if (iconStyle === "numbered") {
+      const nextNum = String(appState.blueprintCategories.length + 1).padStart(2, "0");
+      catTitle = `${nextNum} ${baseName}`;
+    } else if (iconStyle === "symbol") {
+      catTitle = `◆ ${baseName}`;
+    }
+    const subTitle = iconStyle === "emoji_both" ? `📂 ${t("reorg_bp_general_l2")}` : t("reorg_bp_general_l2");
     appState.blueprintCategories.push({
       id: `bp_custom_${Date.now()}`,
-      title: iconStyle === "emoji" ? `📁 ${baseName}` : baseName,
-      subfolders: [{ id: `bp_sub_${Date.now()}`, title: t("reorg_bp_general_l2"), scopeHint: "" }]
+      title: catTitle,
+      subfolders: [{ id: `bp_sub_${Date.now()}`, title: subTitle, scopeHint: "" }]
     });
     renderBlueprintEditor();
     const cards = document.querySelectorAll("#blueprintCardsGrid .blueprint-card");
@@ -590,6 +780,7 @@
   }
 
   function sortPreviewItemsByDestinationFolder() {
+    const sortRule = getSelectedSortRule();
     const byDest = new Map();
     for (const item of appState.reorgItems) {
       const key = String(item.targetFolderId || item.currentFolderId || "1");
@@ -599,8 +790,9 @@
 
     const ordered = [];
     for (const [, list] of byDest.entries()) {
-      ordered.push(...MarkFlowEngine.sortFolderBookmarksByPriority(list));
+      ordered.push(...MarkFlowEngine.sortFolderBookmarksByPriority(list, sortRule));
     }
+    markOrderChangedFlags(ordered);
     appState.reorgItems = ordered;
   }
 
@@ -663,6 +855,8 @@
 
           collectedItems.push({
             _origOrderIdx: bm._origOrderIdx ?? 0,
+            origIndex: bm.origIndex ?? 0,
+            dateAdded: bm.dateAdded || 0,
             id: bm.id,
             originalTitle: bm.title,
             url: bm.url,
@@ -701,6 +895,8 @@
               const finalFolderId = res.targetFolderId || item.bm.parentId;
               collectedItems.push({
                 _origOrderIdx: item.bm._origOrderIdx ?? 0,
+                origIndex: item.bm.origIndex ?? 0,
+                dateAdded: item.bm.dateAdded || 0,
                 id: item.bm.id,
                 originalTitle: item.bm.title,
                 url: item.bm.url,
@@ -742,6 +938,8 @@
 
               collectedItems.push({
                 _origOrderIdx: item.bm._origOrderIdx ?? 0,
+                origIndex: item.bm.origIndex ?? 0,
+                dateAdded: item.bm.dateAdded || 0,
                 id: item.bm.id,
                 originalTitle: item.bm.title,
                 url: item.bm.url,
@@ -766,6 +964,8 @@
               : item.bm.parentTitle;
             collectedItems.push({
               _origOrderIdx: item.bm._origOrderIdx ?? 0,
+              origIndex: item.bm.origIndex ?? 0,
+              dateAdded: item.bm.dateAdded || 0,
               id: item.bm.id,
               originalTitle: item.bm.title,
               url: item.bm.url,
@@ -809,9 +1009,7 @@
 
   function updateReorgKpiSummary() {
     const active = appState.reorgItems.filter(i => !i.ignored);
-    const changed = active.filter(
-      i => i.cleanTitle !== i.originalTitle || String(i.targetFolderId) !== String(i.currentFolderId)
-    );
+    const changed = active.filter(isItemChanged);
     const uniqueFolders = new Set(active.map(i => String(i.targetFolderId || i.currentFolderId)));
 
     document.getElementById("kpiTotalCount").textContent = String(active.length);
@@ -822,7 +1020,6 @@
   function renderPreviewCategoryStatsBar(folderChoices) {
     const bar = document.getElementById("reorgCategoryStatsBar");
     if (!bar) return;
-    bar.innerHTML = "";
 
     const folderMapById = new Map(folderChoices.map(f => [String(f.id), f]));
     const countsByL1 = new Map();
@@ -836,6 +1033,7 @@
 
     for (const item of appState.reorgItems) {
       if (item.ignored) continue;
+      if (appState.previewChangedOnly && !isItemChanged(item)) continue;
       activeTotal++;
       const top = resolveItemTopCategory(item, folderMapById);
       if (!countsByL1.has(top.id)) {
@@ -844,6 +1042,7 @@
       countsByL1.get(top.id).count++;
     }
 
+    const frag = document.createDocumentFragment();
     const makePill = (filterId, label, count) => {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -852,22 +1051,28 @@
       btn.innerHTML = `<span>${escapeHtml(label)}</span><span class="stat-pill-count">${count}</span>`;
       btn.addEventListener("click", () => {
         appState.previewCategoryFilter = filterId;
-        renderReorgPreviewTable();
+        renderReorgPreviewTable({ preserveFilterScroll: true });
       });
       return btn;
     };
 
-    bar.appendChild(makePill("ALL", t("reorg_filter_all"), activeTotal));
+    frag.appendChild(makePill("ALL", t("reorg_filter_all"), activeTotal));
     for (const entry of countsByL1.values()) {
       if (entry.count > 0 || appState.previewCategoryFilter === entry.id) {
-        bar.appendChild(makePill(entry.id, entry.title, entry.count));
+        frag.appendChild(makePill(entry.id, entry.title, entry.count));
       }
     }
+    bar.replaceChildren(frag);
   }
 
-  function renderReorgPreviewTable() {
+  function renderReorgPreviewTable(opts = {}) {
     const tbody = document.getElementById("reorgPreviewTableBody");
-    tbody.innerHTML = "";
+    const statsBar = document.getElementById("reorgCategoryStatsBar");
+    const isStatsVisible = Boolean(statsBar && statsBar.offsetParent !== null);
+    const prevStatsTop =
+      isStatsVisible && (opts.preserveFilterScroll || true)
+        ? statsBar.getBoundingClientRect().top
+        : null;
 
     const folderChoices =
       appState.activeTargetFolders && appState.activeTargetFolders.length > 0
@@ -878,12 +1083,31 @@
     updateReorgKpiSummary();
     renderPreviewCategoryStatsBar(folderChoices);
 
+    const activeItems = appState.reorgItems.filter(i => !i.ignored);
+    const changedActiveCount = activeItems.filter(isItemChanged).length;
+    const unchangedCount = Math.max(0, activeItems.length - changedActiveCount);
+    const hintEl = document.getElementById("reorgUnchangedHint");
+    if (hintEl) {
+      if (activeItems.length > 0 && changedActiveCount === 0) {
+        hintEl.textContent = t("reorg_all_clean_hint");
+        hintEl.classList.remove("hidden");
+      } else if (appState.previewChangedOnly && unchangedCount > 0) {
+        hintEl.textContent = t("reorg_unchanged_hidden_hint", { count: unchangedCount });
+        hintEl.classList.remove("hidden");
+      } else {
+        hintEl.textContent = "";
+        hintEl.classList.add("hidden");
+      }
+    }
+
     const restoreSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`;
     const skipSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
 
+    const rowFrag = document.createDocumentFragment();
     let renderedCount = 0;
 
     appState.reorgItems.forEach((item, idx) => {
+      if (appState.previewChangedOnly && !isItemChanged(item)) return;
       if (appState.previewCategoryFilter !== "ALL") {
         const top = resolveItemTopCategory(item, folderMapById);
         if (top.id !== appState.previewCategoryFilter) return;
@@ -897,6 +1121,12 @@
         item.funcGroup && item.funcGroup !== "常规条目"
           ? `<span class="func-group-badge">${escapeHtml(item.funcGroup)}</span>`
           : "";
+      const titleChanged = Boolean(item.cleanTitle && item.cleanTitle !== item.originalTitle);
+      const folderChanged = String(item.targetFolderId) !== String(item.currentFolderId);
+      const orderBadge =
+        !titleChanged && !folderChanged && item.orderChanged
+          ? `<span class="order-only-badge">${escapeHtml(t("reorg_badge_order_only"))}</span>`
+          : "";
 
       tr.innerHTML = `
         <td>
@@ -906,7 +1136,7 @@
         <td>
           <input type="text" class="form-input reorg-title-input" data-idx="${idx}" value="${escapeHtml(item.cleanTitle)}" style="font-size: 12px; padding: 6px 8px;">
           <div style="font-size: 11px; color: var(--accent); margin-top: 3px; display: flex; align-items: center; flex-wrap: wrap;">
-            <span>${escapeHtml(item.reason)}</span>${groupBadge}
+            <span>${escapeHtml(item.reason)}</span>${groupBadge}${orderBadge}
           </div>
         </td>
         <td>
@@ -931,13 +1161,34 @@
         sel.appendChild(opt);
       });
 
-      tbody.appendChild(tr);
+      rowFrag.appendChild(tr);
     });
 
     if (renderedCount === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">${escapeHtml(
-        t("reorg_filter_empty")
-      )}</td></tr>`;
+      const emptyTr = document.createElement("tr");
+      const emptyMsg =
+        appState.previewChangedOnly && activeItems.length > 0 && changedActiveCount === 0
+          ? t("reorg_all_clean_hint")
+          : t("reorg_filter_empty");
+      emptyTr.innerHTML = `<td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">${escapeHtml(
+        emptyMsg
+      )}</td>`;
+      rowFrag.appendChild(emptyTr);
+    }
+
+    tbody.replaceChildren(rowFrag);
+
+    const tableWrap = tbody.parentElement && tbody.parentElement.parentElement;
+    if (tableWrap && tableWrap.scrollTop > 0) {
+      tableWrap.scrollTop = 0;
+    }
+
+    if (statsBar && prevStatsTop !== null) {
+      const nextStatsTop = statsBar.getBoundingClientRect().top;
+      const scrollDelta = nextStatsTop - prevStatsTop;
+      if (Math.abs(scrollDelta) > 1) {
+        window.scrollBy({ top: scrollDelta, behavior: "instant" });
+      }
     }
 
     tbody.querySelectorAll(".reorg-title-input").forEach(inp => {
@@ -954,16 +1205,17 @@
         appState.reorgItems[idx].targetFolderId = e.target.value;
         const f = folderChoices.find(item => String(item.id) === String(e.target.value));
         if (f) appState.reorgItems[idx].targetFolderName = f.breadcrumb;
+        markOrderChangedFlags(appState.reorgItems);
         updateReorgKpiSummary();
         renderPreviewCategoryStatsBar(folderChoices);
       });
     });
 
     tbody.querySelectorAll(".reorg-toggle-btn").forEach(btn => {
-      btn.addEventListener("click", e => {
-        const idx = Number(e.currentTarget.getAttribute("data-idx"));
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.getAttribute("data-idx"));
         appState.reorgItems[idx].ignored = !appState.reorgItems[idx].ignored;
-        renderReorgPreviewTable();
+        renderReorgPreviewTable({ preserveFilterScroll: true });
       });
     });
   }
@@ -976,24 +1228,37 @@
    * 全部移动均为“向更小索引移动”，可彻底避免 Chromium 同目录前向移动引起的索引偏移问题。
    */
   async function enforceFolderBookmarkOrder(folderId, orderedBookmarkIds) {
-    if (!folderId || !orderedBookmarkIds || orderedBookmarkIds.length <= 1) return;
+    if (!folderId || !orderedBookmarkIds || orderedBookmarkIds.length <= 1) return false;
     const fid = String(folderId);
     const liveChildren = await chrome.bookmarks.getChildren(fid);
     const subfolders = liveChildren.filter(c => !c.url);
-    const liveBookmarkIds = new Set(liveChildren.filter(c => !!c.url).map(c => String(c.id)));
+    const liveBookmarks = liveChildren.filter(c => !!c.url);
+    const liveBookmarkIds = new Set(liveBookmarks.map(c => String(c.id)));
 
-    for (let s = subfolders.length - 1; s >= 0; s--) {
-      await chrome.bookmarks.move(String(subfolders[s].id), { parentId: fid, index: 0 });
+    const subfoldersInFront = liveChildren.slice(0, subfolders.length).every(c => !c.url);
+    const validOrdered = orderedBookmarkIds.filter(id => liveBookmarkIds.has(String(id))).map(String);
+    const currentPrefix = liveBookmarks.slice(0, validOrdered.length).map(c => String(c.id));
+    const orderAlreadyMatches =
+      subfoldersInFront &&
+      validOrdered.length === currentPrefix.length &&
+      validOrdered.every((id, idx) => id === currentPrefix[idx]);
+
+    if (orderAlreadyMatches) return false;
+
+    if (!subfoldersInFront) {
+      for (let s = subfolders.length - 1; s >= 0; s--) {
+        await chrome.bookmarks.move(String(subfolders[s].id), { parentId: fid, index: 0 });
+      }
     }
 
     const targetStartIdx = subfolders.length;
-    const validOrdered = orderedBookmarkIds.filter(id => liveBookmarkIds.has(String(id)));
     for (let i = validOrdered.length - 1; i >= 0; i--) {
       await chrome.bookmarks.move(String(validOrdered[i]), {
         parentId: fid,
         index: targetStartIdx
       });
     }
+    return true;
   }
 
   async function applyReorganizerChanges() {
@@ -1001,6 +1266,15 @@
     if (activeItems.length === 0) {
       showToast(t("reorg_toast_no_active"), true);
       return;
+    }
+
+    const sortRule = getSelectedSortRule();
+    if (appState.activeReorgMode !== "rebuild") {
+      const changedItems = activeItems.filter(isItemChanged);
+      if (changedItems.length === 0) {
+        showToast(t("reorg_toast_no_changes"));
+        return;
+      }
     }
 
     const btnApply = document.getElementById("btnApplyReorganize");
@@ -1045,7 +1319,7 @@
         }
 
         for (const [fid, bucket] of itemsByRealFolder.entries()) {
-          const sorted = MarkFlowEngine.sortFolderBookmarksByPriority(bucket);
+          const sorted = MarkFlowEngine.sortFolderBookmarksByPriority(bucket, sortRule);
           await enforceFolderBookmarkOrder(fid, sorted.map(it => it.id));
         }
 
@@ -1069,28 +1343,36 @@
           document.getElementById("chkSortInFolders").checked;
 
         const itemsByDestFolder = new Map();
+        const dirtyFolderIds = new Set();
         let updatedCount = 0;
 
         for (const item of activeItems) {
-          if (item.cleanTitle && item.cleanTitle !== item.originalTitle) {
+          const titleChanged = Boolean(item.cleanTitle && item.cleanTitle !== item.originalTitle);
+          if (titleChanged) {
             await chrome.bookmarks.update(item.id, { title: item.cleanTitle });
           }
           const destId = String(item.targetFolderId || item.currentFolderId);
-          if (destId !== String(item.currentFolderId)) {
+          const folderChanged = destId !== String(item.currentFolderId);
+          if (folderChanged) {
             await chrome.bookmarks.move(item.id, { parentId: destId });
+          }
+          if (titleChanged || folderChanged || item.orderChanged) {
+            updatedCount++;
+          }
+          if (folderChanged || item.orderChanged) {
+            dirtyFolderIds.add(destId);
           }
           if (!itemsByDestFolder.has(destId)) itemsByDestFolder.set(destId, []);
           itemsByDestFolder.get(destId).push(item);
-          updatedCount++;
         }
 
         let sortedFoldersCount = 0;
         if (shouldSort) {
           for (const [fid, bucket] of itemsByDestFolder.entries()) {
-            if (bucket.length > 1) {
-              const sorted = MarkFlowEngine.sortFolderBookmarksByPriority(bucket);
-              await enforceFolderBookmarkOrder(fid, sorted.map(it => it.id));
-              sortedFoldersCount++;
+            if (bucket.length > 1 && dirtyFolderIds.has(fid)) {
+              const sorted = MarkFlowEngine.sortFolderBookmarksByPriority(bucket, sortRule);
+              const didReorder = await enforceFolderBookmarkOrder(fid, sorted.map(it => it.id));
+              if (didReorder) sortedFoldersCount++;
             }
           }
         }
@@ -1107,6 +1389,7 @@
       parseFolderStructures(postTree);
       populateReorgFolderSelect();
       renderLockedFoldersChecklist();
+      updateReorgTokenEstimate();
       setStartButtonDemoted(false);
     } catch (err) {
       showToast(t("reorg_toast_apply_err", { msg: err.message }), true);
@@ -1212,6 +1495,8 @@
           id: String(node.id),
           title: node.title,
           url: node.url,
+          origIndex: Number(node.index ?? 0),
+          dateAdded: Number(node.dateAdded || 0),
           parentId: String(node.parentId || ""),
           parentTitle: parentTrail || "Bookmarks Bar"
         });
@@ -1232,6 +1517,8 @@
           id: String(node.id),
           title: node.title,
           url: node.url,
+          origIndex: Number(node.index ?? 0),
+          dateAdded: Number(node.dateAdded || 0),
           parentId: String(node.parentId || ""),
           parentTitle: parentTrail || "Bookmarks Bar"
         });
@@ -1259,4 +1546,5 @@
   ctx.syncReorgStartButtonLabel = syncReorgStartButtonLabel;
   ctx.populateReorgFolderSelect = populateReorgFolderSelect;
   ctx.renderLockedFoldersChecklist = renderLockedFoldersChecklist;
+  ctx.updateReorgTokenEstimate = updateReorgTokenEstimate;
 })(window);

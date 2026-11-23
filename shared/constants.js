@@ -9,6 +9,15 @@
   "use strict";
 
   const PROVIDER_PRESETS = {
+    deepseek: {
+      name: "DeepSeek",
+      baseUrl: "https://api.deepseek.com/v1",
+      apiKey: "",
+      model: "deepseek-flash",
+      quickModels: ["deepseek-flash", "deepseek-v4-pro", "deepseek-reasoner"],
+      keyPlaceholder: "sk-...",
+      urlHintKey: "ai_base_url_hint"
+    },
     siliconflow: {
       name: "SiliconFlow",
       baseUrl: "https://api.siliconflow.cn/v1",
@@ -22,6 +31,20 @@
       ],
       keyPlaceholder: "sk-...",
       urlHintKey: "ai_base_url_hint"
+    },
+    openrouter: {
+      name: "OpenRouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      apiKey: "",
+      model: "google/gemini-2.5-flash",
+      quickModels: [
+        "google/gemini-2.5-flash",
+        "deepseek/deepseek-chat-v3-0324",
+        "anthropic/claude-sonnet-4",
+        "openai/gpt-4.1-mini"
+      ],
+      keyPlaceholder: "sk-or-v1-...",
+      urlHintKey: "ai_openrouter_url_hint"
     },
     gemini: {
       name: "Google Gemini",
@@ -51,14 +74,19 @@
       keyPlaceholder: "AIzaSy... / AQ.... / ya29....",
       urlHintKey: "ai_gemini_url_hint"
     },
-    deepseek: {
-      name: "DeepSeek",
-      baseUrl: "https://api.deepseek.com/v1",
+    claude: {
+      name: "Claude (Anthropic)",
+      baseUrl: "https://api.anthropic.com/v1",
       apiKey: "",
-      model: "deepseek-flash",
-      quickModels: ["deepseek-flash", "deepseek-v4-pro", "deepseek-reasoner"],
-      keyPlaceholder: "sk-...",
-      urlHintKey: "ai_base_url_hint"
+      model: "claude-sonnet-4-5",
+      quickModels: [
+        "claude-haiku-4-5",
+        "claude-sonnet-4-5",
+        "claude-opus-4-1",
+        "claude-3-7-sonnet-latest"
+      ],
+      keyPlaceholder: "sk-ant-...",
+      urlHintKey: "ai_claude_url_hint"
     },
     openai: {
       name: "OpenAI",
@@ -67,6 +95,15 @@
       model: "gpt-6-luna",
       quickModels: ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-sol"],
       keyPlaceholder: "sk-...",
+      urlHintKey: "ai_base_url_hint"
+    },
+    grok: {
+      name: "Grok (xAI)",
+      baseUrl: "https://api.x.ai/v1",
+      apiKey: "",
+      model: "grok-3-mini",
+      quickModels: ["grok-3-mini", "grok-3", "grok-4-fast"],
+      keyPlaceholder: "xai-...",
       urlHintKey: "ai_base_url_hint"
     },
     ollama: {
@@ -84,7 +121,7 @@
       apiKey: "",
       model: "",
       quickModels: [],
-      keyPlaceholder: "sk-... / AIzaSy...",
+      keyPlaceholder: "sk-... / AIzaSy... / sk-ant-...",
       urlHintKey: "ai_base_url_hint"
     }
   };
@@ -212,6 +249,7 @@
     extractPageContext: true,
     subfolderPolicy: "balanced",
     ruleMatchUseAiTitle: false,
+    reorgSortRule: "smart",
     customInstruction: ""
   };
 

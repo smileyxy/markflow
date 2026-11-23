@@ -192,10 +192,22 @@
               </div>
 
               <div class="sort-option-bar">
-                <label class="sort-checkbox-label">
-                  <input type="checkbox" id="chkSortInFolders" checked>
-                  <span data-i18n="reorg_sort_toggle_label">同步按优先级重排目录内顺序（同功能聚簇 → 同站点/端口紧邻 → 自然序）</span>
-                </label>
+                <div class="sort-option-main">
+                  <label class="sort-checkbox-label">
+                    <input type="checkbox" id="chkSortInFolders" checked>
+                    <span data-i18n="reorg_sort_toggle_label">同步按优先级重排目录内顺序（同功能聚簇 → 同站点/端口紧邻 → 自然序）</span>
+                  </label>
+                  <div class="sort-rule-inline">
+                    <label for="selReorgSortRule" class="sort-rule-label" data-i18n="reorg_sort_rule_label">排序规则：</label>
+                    <select id="selReorgSortRule" class="form-select" data-custom-select="form">
+                      <option value="smart" data-i18n="reorg_sort_smart">智能优先级（功能聚簇 → 同站点与端口 → 自然序）</option>
+                      <option value="site" data-i18n="reorg_sort_site">同站点与端口优先（不拆分功能分组）</option>
+                      <option value="title_asc" data-i18n="reorg_sort_title_asc">标题自然序 A → Z</option>
+                      <option value="newest" data-i18n="reorg_sort_newest">最新收藏优先（时间降序）</option>
+                      <option value="oldest" data-i18n="reorg_sort_oldest">最早收藏优先（时间升序）</option>
+                    </select>
+                  </div>
+                </div>
                 <button id="btnQuickSortOnly" class="btn btn-secondary btn-sm" type="button">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -209,11 +221,14 @@
 
             <!-- 全盘重构目录选项 -->
             <div id="rebuildModeOptions" class="rebuild-options-panel hidden">
-              <div class="form-group" style="max-width: 440px;">
+              <div class="form-group" style="max-width: 460px;">
                 <label class="form-label" data-i18n="reorg_icon_style_label">新一级目录视觉风格</label>
                 <select id="selRebuildIconStyle" class="form-select" data-custom-select="form">
                   <option value="emoji" data-i18n="reorg_icon_emoji">语义图标前缀风（一级带图标，二级纯文字）</option>
+                  <option value="emoji_both" data-i18n="reorg_icon_emoji_both">双层图标风（一级与二级目录均带图标）</option>
                   <option value="plain" data-i18n="reorg_icon_plain">纯文字清爽风（一级与二级目录均不带图标）</option>
+                  <option value="numbered" data-i18n="reorg_icon_numbered">数字序号索引风（01 工作 · 02 技术）</option>
+                  <option value="symbol" data-i18n="reorg_icon_symbol">极简几何符号风（◆ 工作 · ◆ 技术）</option>
                 </select>
               </div>
 
@@ -224,6 +239,7 @@
             </div>
 
             <div class="reorg-trigger-bar">
+              <div id="reorgTokenEstimate" class="token-estimate-pill"></div>
               <button id="btnStartReorganize" class="btn btn-primary" type="button">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                 <span id="btnStartReorgLabel" data-i18n="btn_start_reorg">开始智能归类与排序</span>
@@ -295,6 +311,14 @@
               </div>
             </div>
 
+            <div class="reorg-preview-toolbar">
+              <label class="sort-checkbox-label">
+                <input type="checkbox" id="chkPreviewChangedOnly" checked>
+                <span data-i18n="reorg_changed_only_label">仅显示并调整有变动项</span>
+              </label>
+              <span id="reorgUnchangedHint" class="text-muted" style="font-size: 12px;"></span>
+            </div>
+
             <div id="reorgCategoryStatsBar" class="reorg-stats-bar"></div>
 
             <div class="table-container" style="max-height: 480px; overflow-y: auto;">
@@ -335,21 +359,33 @@
           <div class="form-group">
             <label class="form-label" data-i18n="ai_preset_label">推荐服务商预设（各服务商独立持久化保存）</label>
             <div class="provider-grid" id="providerPresetGrid">
-              <button class="preset-btn active" data-provider="siliconflow" type="button">
+              <button class="preset-btn active" data-provider="deepseek" type="button">
+                <span class="preset-name">DeepSeek</span>
+                <span class="preset-tag">V4.1 Flash / Reasoner</span>
+              </button>
+              <button class="preset-btn" data-provider="siliconflow" type="button">
                 <span class="preset-name">SiliconFlow</span>
                 <span class="preset-tag">DeepSeek V4.1 / Qwen3.5</span>
+              </button>
+              <button class="preset-btn" data-provider="openrouter" type="button">
+                <span class="preset-name">OpenRouter</span>
+                <span class="preset-tag">Multi-Model Gateway</span>
               </button>
               <button class="preset-btn" data-provider="gemini" type="button">
                 <span class="preset-name">Google Gemini</span>
                 <span class="preset-tag">Gemini API / Vertex AI</span>
               </button>
-              <button class="preset-btn" data-provider="deepseek" type="button">
-                <span class="preset-name">DeepSeek</span>
-                <span class="preset-tag">V4.1 Flash</span>
+              <button class="preset-btn" data-provider="claude" type="button">
+                <span class="preset-name">Claude (Anthropic)</span>
+                <span class="preset-tag">Claude 4.5 Sonnet / Haiku</span>
               </button>
               <button class="preset-btn" data-provider="openai" type="button">
                 <span class="preset-name">OpenAI</span>
                 <span class="preset-tag">GPT-6 Luna / Terra</span>
+              </button>
+              <button class="preset-btn" data-provider="grok" type="button">
+                <span class="preset-name">Grok (xAI)</span>
+                <span class="preset-tag">Grok 4 / 3 Mini</span>
               </button>
               <button class="preset-btn" data-provider="ollama" type="button">
                 <span class="preset-name">Ollama (Local)</span>
@@ -357,7 +393,7 @@
               </button>
               <button class="preset-btn" data-provider="custom" type="button">
                 <span class="preset-name">Custom Endpoint</span>
-                <span class="preset-tag">OpenAI / Gemini API</span>
+                <span class="preset-tag">OpenAI / Gemini / Claude</span>
               </button>
             </div>
           </div>
@@ -701,11 +737,6 @@
 
           <div class="sponsor-wechat-wrapper">
             <div class="sponsor-wechat-card">
-              <div class="channel-title">
-                <span class="channel-dot" style="background:#07c160;"></span>
-                <span data-i18n="sponsor_wechat_title">赞赏码</span>
-              </div>
-
               <div class="wechat-qr-frame">
                 <img id="wechatQrImg" class="wechat-qr-img hidden" src="../icons/wechat-sponsor.jpg" alt="Appreciation Code">
                 <div id="wechatQrPlaceholder" class="qr-placeholder">

@@ -19,7 +19,7 @@
     rules: [],
     aiConfig: {
       enabled: false,
-      provider: "siliconflow",
+      provider: "deepseek",
       providers: {}
     },
     preferences: Object.assign({}, MarkFlowEngine.DEFAULT_PREFERENCES),
@@ -40,6 +40,7 @@
     rebuildRawBookmarks: [],
     activeTargetFolders: [],
     previewCategoryFilter: "ALL",
+    previewChangedOnly: true,
     reorgItems: []
   };
 

@@ -20,7 +20,7 @@
 
     chkAiEnabled.checked = !!appState.aiConfig.enabled;
 
-    const currentProvider = appState.aiConfig.provider || "siliconflow";
+    const currentProvider = appState.aiConfig.provider || "deepseek";
     const activeConfig =
       appState.aiConfig.providers[currentProvider] || DEFAULT_PROVIDERS[currentProvider];
 
@@ -67,7 +67,7 @@
     });
 
     document.getElementById("btnFetchModels").addEventListener("click", async () => {
-      const provider = appState.aiConfig.provider || "siliconflow";
+      const provider = appState.aiConfig.provider || "deepseek";
       const baseUrl = inputBaseUrl.value.trim();
       const apiKey = inputApiKey.value.trim();
 
@@ -89,7 +89,11 @@
         document.getElementById("fetchedModelsFilter").value = "";
         renderFetchedModelsList("");
         document.getElementById("fetchedModelsPanel").classList.remove("hidden");
-        showToast(t("ai_toast_fetched", { count: models.length }));
+        showToast(
+          models.isFallbackCatalog
+            ? t("ai_toast_vertex_catalog", { count: models.length })
+            : t("ai_toast_fetched", { count: models.length })
+        );
       } catch (err) {
         showToast(t("ai_toast_fetch_err", { msg: err.message }), true);
       } finally {
@@ -106,7 +110,7 @@
     });
 
     document.getElementById("btnSaveAI").addEventListener("click", async () => {
-      const curProvider = appState.aiConfig.provider || "siliconflow";
+      const curProvider = appState.aiConfig.provider || "deepseek";
       appState.aiConfig.enabled = chkAiEnabled.checked;
 
       if (!appState.aiConfig.providers) appState.aiConfig.providers = {};
@@ -121,11 +125,12 @@
       appState.aiConfig.model = inputModel.value.trim();
 
       await chrome.storage.local.set({ aiConfig: appState.aiConfig });
+      if (ctx.updateReorgTokenEstimate) ctx.updateReorgTokenEstimate();
       showToast(t("ai_toast_saved"));
     });
 
     document.getElementById("btnTestAI").addEventListener("click", async () => {
-      const provider = appState.aiConfig.provider || "siliconflow";
+      const provider = appState.aiConfig.provider || "deepseek";
       const baseUrl = inputBaseUrl.value.trim();
       const apiKey = inputApiKey.value.trim();
       const model = inputModel.value.trim();
@@ -140,15 +145,17 @@
       testBtn.querySelector("span").textContent = t("btn_test_ai_loading");
 
       try {
-        const reply = await MarkFlowEngine.testAIConnection({ provider, baseUrl, apiKey, model });
+        await MarkFlowEngine.testAIConnection({ provider, baseUrl, apiKey, model });
         const proto = MarkFlowEngine.detectProtocol(provider, baseUrl);
         const protoTag =
-          proto === "vertex"
-            ? "Vertex AI"
-            : proto === "gemini"
-              ? "Gemini Native"
-              : "OpenAI Compatible";
-        showToast(t("ai_toast_test_ok", { proto: protoTag, reply: String(reply).slice(0, 32) }));
+          proto === "anthropic"
+            ? "Anthropic Claude"
+            : proto === "vertex"
+              ? "Vertex AI"
+              : proto === "gemini"
+                ? "Gemini Native"
+                : "OpenAI Compatible";
+        showToast(t("ai_toast_test_ok", { proto: protoTag }));
       } catch (err) {
         showToast(t("ai_toast_test_err", { msg: err.message }), true);
       } finally {
@@ -160,7 +167,7 @@
 
   function updateProviderUiMeta(providerKey) {
     const preset =
-      MarkFlowEngine.PROVIDER_PRESETS[providerKey] || MarkFlowEngine.PROVIDER_PRESETS.siliconflow;
+      MarkFlowEngine.PROVIDER_PRESETS[providerKey] || MarkFlowEngine.PROVIDER_PRESETS.deepseek;
     const inputBaseUrl = document.getElementById("inputBaseUrl");
     const inputApiKey = document.getElementById("inputApiKey");
     const inputModel = document.getElementById("inputModel");
@@ -238,10 +245,66 @@
     });
   }
 
+  /**
+   * 按模型厂商前缀或型号家族将模型 ID 归类分组，便于在折叠手风琴面板中浏览与筛选。
+   */
+  function groupFetchedModelIds(ids) {
+    const VENDOR_NAMES = {
+      google: "Google",
+      anthropic: "Anthropic",
+      openai: "OpenAI",
+      deepseek: "DeepSeek",
+      "x-ai": "xAI",
+      meta: "Meta Llama",
+      "meta-llama": "Meta Llama",
+      qwen: "Qwen",
+      mistralai: "Mistral",
+      cohere: "Cohere"
+    };
+
+    const resolveGroup = rawId => {
+      const s = String(rawId || "").trim();
+      if (s.includes("/")) {
+        const prefix = s.split("/")[0].toLowerCase();
+        if (VENDOR_NAMES[prefix]) return VENDOR_NAMES[prefix];
+        return prefix.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      }
+      const low = s.toLowerCase();
+      if (/gemini-4/i.test(low)) return "Gemini 4.x";
+      if (/gemini-3/i.test(low)) return "Gemini 3.x";
+      if (/gemini-2\.5/i.test(low)) return "Gemini 2.5";
+      if (/gemini-2/i.test(low)) return "Gemini 2.0";
+      if (/claude-.*4|claude-4/i.test(low)) return "Claude 4.x";
+      if (/claude-3/i.test(low)) return "Claude 3.x";
+      if (/claude/i.test(low)) return "Claude";
+      if (/gpt-6/i.test(low)) return "GPT-6";
+      if (/gpt-5/i.test(low)) return "GPT-5";
+      if (/gpt-4/i.test(low)) return "GPT-4";
+      if (/^o[134](-|$)/i.test(low)) return "o-Series";
+      if (/grok-4/i.test(low)) return "Grok 4";
+      if (/grok-3/i.test(low)) return "Grok 3";
+      if (/deepseek/i.test(low)) return "DeepSeek";
+      if (/qwen/i.test(low)) return "Qwen";
+      if (/llama/i.test(low)) return "Llama";
+      if (/glm/i.test(low)) return "GLM";
+      return "Other";
+    };
+
+    const map = new Map();
+    for (const id of ids) {
+      const groupName = resolveGroup(id);
+      if (!map.has(groupName)) map.set(groupName, []);
+      map.get(groupName).push(id);
+    }
+
+    return Array.from(map.entries()).map(([name, models]) => ({ name, models }));
+  }
+
   function renderFetchedModelsList(filterText) {
     const listEl = document.getElementById("fetchedModelsList");
     const inputModel = document.getElementById("inputModel");
     listEl.innerHTML = "";
+    listEl.classList.add("fetched-models-groups");
 
     const q = (filterText || "").trim().toLowerCase();
     const matched = appState.fetchedModelIds.filter(id => !q || id.toLowerCase().includes(q));
@@ -253,19 +316,39 @@
       return;
     }
 
-    matched.slice(0, 80).forEach(m => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "model-chip-btn" + (inputModel.value.trim() === m ? " active" : "");
-      btn.textContent = m;
-      btn.addEventListener("click", () => {
-        inputModel.value = m;
-        syncActiveModelChip(m);
-        listEl.querySelectorAll(".model-chip-btn").forEach(b => {
-          b.classList.toggle("active", b.textContent === m);
+    const currentVal = inputModel.value.trim();
+    const groups = groupFetchedModelIds(matched);
+
+    groups.forEach((grp, gIdx) => {
+      const details = document.createElement("details");
+      details.className = "model-group-accordion";
+      const hasCurrent = currentVal && grp.models.includes(currentVal);
+      if (q.length > 0 || gIdx < 2 || hasCurrent) {
+        details.open = true;
+      }
+
+      const summary = document.createElement("summary");
+      summary.className = "model-group-summary";
+      summary.innerHTML = `<span>${escapeHtml(grp.name)}</span><span class="model-group-count">${grp.models.length}</span>`;
+
+      const chipWrap = document.createElement("div");
+      chipWrap.className = "model-group-chips";
+
+      grp.models.forEach(m => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "model-chip-btn" + (currentVal === m ? " active" : "");
+        btn.textContent = m;
+        btn.addEventListener("click", () => {
+          inputModel.value = m;
+          syncActiveModelChip(m);
         });
+        chipWrap.appendChild(btn);
       });
-      listEl.appendChild(btn);
+
+      details.appendChild(summary);
+      details.appendChild(chipWrap);
+      listEl.appendChild(details);
     });
   }
 

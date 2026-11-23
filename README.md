@@ -63,11 +63,11 @@ Browser bookmark bars quickly turn into unsearchable clutter: bloated SEO page t
 ## 🚀 Core Features
 
 ### 1. Smart Reorganizer & Taxonomy Architect
-- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and deterministically sorting each folder by **P1 Functional Cluster → P2 Same-Site / Port Proximity → P3 Natural Order**.
-- **0-Token Quick Sort**: Reorder bookmarks inside existing folders purely locally using domain/port clustering without any AI calls.
+- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and sorting inside each folder with **5 sort rules** (*Smart Priority Tiered*, *Site Domain & Port*, *Title A → Z*, *Newest First*, *Oldest First*) plus a **Changed-Only Preview & Apply** toggle so untouched bookmarks stay intact.
+- **0-Token Quick Sort**: Reorder bookmarks inside existing folders purely locally using your chosen sort rule without any AI calls.
 - **Two-Stage Full Rebuild**:
-  1. **Blueprint Review**: AI proposes a concise two-level folder hierarchy where you can lock existing folders, rename nodes, or add/remove subfolders;
-  2. **Atomic Migration**: Bulk-maps bookmarks, folds single-item orphan subfolders, priority-sorts every destination folder, and safely removes empty legacy folders.
+  1. **Blueprint Review**: AI proposes a two-level folder hierarchy with **5 visual folder styles** (Semantic Icons, Dual Icons, Plain Text, Numbered `01`, Minimal Symbol `◆`) where you can lock existing folders, rename nodes, or add/remove subfolders;
+  2. **Atomic Migration**: Bulk-maps bookmarks (with a real-time **local Token Estimator** before running), folds single-item orphan subfolders, sorts every destination folder, and safely removes empty legacy folders.
 - **Dual Backup Safety**: Export a standard Netscape HTML backup anytime with one click, plus automatic timestamped HTML backup downloads before applying any bulk changes.
 
 ### 2. Local Rule Engine
@@ -89,16 +89,19 @@ Full localized UI & extension metadata across **7 languages**:
 
 ## 🤖 Supported AI Providers
 
-Each provider stores its Base URL, credential, and model ID independently, with one-click live `/models` fetching:
+Each provider stores its Base URL, credential, and model ID independently, with one-click live `/models` fetching and collapsible vendor/family model grouping:
 
 | Provider | Protocol | Recommended Models | Notes |
 | :--- | :--- | :--- | :--- |
-| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-3.8-flash` / `gemini-3.5-flash` | Built-in quick presets for **Gemini API**, **Vertex AI Express** (`aiplatform.googleapis.com/v1/publishers/google`), and **Vertex AI Project/Regional** endpoints (auto-detects API Key or `Bearer` / `ya29.` OAuth Token); `/v1` & `/openai` relays auto-switch to OpenAI mode |
+| **DeepSeek** | OpenAI Compatible | `deepseek-flash` / `deepseek-v4-pro` | Default preset; fast technical & multilingual classification |
 | **SiliconFlow** | OpenAI Compatible | `DeepSeek-V4.1-Flash` / `Qwen3.5-35B-A3B` | Fast, cost-effective OpenAI-compatible hosting |
-| **DeepSeek** | OpenAI Compatible | `deepseek-flash` / `deepseek-v4-pro` | Strong technical & multilingual classification |
+| **OpenRouter** | OpenAI Compatible | `google/gemini-2.5-flash` / `anthropic/claude-sonnet-4` | Unified gateway across 100+ models grouped by vendor prefix |
+| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-3.8-flash` / `gemini-3.5-flash` | Built-in presets for **Gemini API**, **Vertex AI Express**, and **Vertex AI Project** endpoints (auto API Key / `Bearer` / `ya29.` OAuth + built-in Vertex catalog fallback) |
+| **Claude (Anthropic)** | Anthropic Messages (`/v1/messages`) | `claude-sonnet-4-5` / `claude-haiku-4-5` | Native browser-direct CORS Messages API support |
 | **OpenAI** | OpenAI Compatible | `gpt-6-luna` / `gpt-6.1-terra` | Standard global OpenAI endpoint |
-| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.5:9b` / `gemma4:12b` | 100% offline local inference, no API Key required |
-| **Custom Endpoint** | OpenAI / Gemini / Vertex | Any Model ID | Supports OpenRouter, self-hosted gateways, or custom relays |
+| **Grok (xAI)** | OpenAI Compatible | `grok-3-mini` / `grok-4-fast` | Official xAI API endpoint |
+| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.5:9b` / `gemma4:12b` | 100% offline local inference, no API Key & zero token cost |
+| **Custom Endpoint** | OpenAI / Anthropic / Gemini / Vertex | Any Model ID | Supports self-hosted gateways, enterprise proxies, or custom relays |
 
 ---
 

@@ -17,8 +17,33 @@
 
   const { DEFAULT_PREFERENCES, MULTI_TOPIC_DOMAINS } = constants;
   const { parseUrlInfo, cleanTitleLocally, finalizeTitle, stripLeadingEmoji } = utils;
+  const { matchRuleEngine } = rules;
   const { resolveActiveProviderConfig, callLLM } = llm;
   const { inferLocalFuncGroup } = sorter;
+
+  /** 移除目录标题开头的 Emoji、编号或几何符号装饰前缀 */
+  function stripVisualDecorations(str) {
+    return stripLeadingEmoji(String(str || "").trim())
+      .replace(/^(?:\d{2,}[\s.、·-]+|[◆▸■•★▪❖➤]\s*)/u, "")
+      .trim();
+  }
+
+  /** 根据视觉风格枚举构造系统提示词中的命名格式要求 */
+  function buildIconStyleInstruction(iconStyle) {
+    if (iconStyle === "emoji_both") {
+      return "所有【一级主目录】与【二级子目录】名称开头均须带 1 个贴合语义的 Emoji 图标 + 空格 + 精炼名称。";
+    }
+    if (iconStyle === "plain") {
+      return "所有【一级主目录】和【二级子目录】统一使用清爽纯文字命名，禁止添加任何 Emoji、数字序号或符号前缀。";
+    }
+    if (iconStyle === "numbered") {
+      return "每个【一级主目录】名称开头使用两位数字编号（例如 01 工作、02 技术）；所有【二级子目录】统一使用纯文字（不加编号与 Emoji）。";
+    }
+    if (iconStyle === "symbol") {
+      return "每个【一级主目录】名称开头使用几何符号前缀「◆ 」（例如 ◆ 工作、◆ 技术）；所有【二级子目录】统一使用纯文字（不加符号与 Emoji）。";
+    }
+    return "每个【一级主目录】名称开头带 1 个贴合语义的 Emoji 图标 + 空格 + 精炼名称；所有【二级子目录】统一使用纯文字（禁止加 Emoji）。";
+  }
 
   /** 构建注入模型的现有目录架构与样本摘要文本 */
   function buildFolderCataloguePrompt(treeAnalysis) {
@@ -234,10 +259,7 @@ ${titleStyleRule}
       );
     }
 
-    const iconInstruction =
-      iconStyle === "emoji"
-        ? "每个【一级主目录】名称开头带 1 个贴合语义的 Emoji 图标 + 空格 + 精炼名称；所有【二级子目录】统一使用纯文字（禁止加 Emoji）。"
-        : "所有【一级主目录】和【二级子目录】统一使用清爽纯文字命名，禁止添加任何 Emoji 表情符号。";
+    const iconInstruction = buildIconStyleInstruction(iconStyle);
 
     const lockedNotice =
       lockedFolders.length > 0
@@ -346,9 +368,17 @@ ${fullInventoryLines.join("\n")}
       let l1Title = String(cat.title || "").trim();
       if (!l1Title) return;
       if (iconStyle === "plain") {
-        l1Title = stripLeadingEmoji(l1Title);
+        l1Title = stripVisualDecorations(l1Title);
+      } else if (iconStyle === "numbered") {
+        const cleanBase = stripVisualDecorations(l1Title);
+        if (!cleanBase) return;
+        l1Title = `${String(normalized.length + 1).padStart(2, "0")} ${cleanBase}`;
+      } else if (iconStyle === "symbol") {
+        const cleanBase = stripVisualDecorations(l1Title);
+        if (!cleanBase) return;
+        l1Title = `◆ ${cleanBase}`;
       }
-      const dedupKey = stripLeadingEmoji(l1Title).toLowerCase();
+      const dedupKey = stripVisualDecorations(l1Title).toLowerCase();
       if (!dedupKey || seenL1.has(dedupKey)) return;
       seenL1.add(dedupKey);
 
@@ -361,9 +391,14 @@ ${fullInventoryLines.join("\n")}
       const subs = [];
       (Array.isArray(cat.subfolders) ? cat.subfolders : []).forEach((sub, sIdx) => {
         const rawSubTitle = typeof sub === "string" ? sub : sub && sub.title;
-        const subTitle = stripLeadingEmoji(String(rawSubTitle || "").trim());
-        if (!subTitle || seenSub.has(subTitle.toLowerCase())) return;
-        seenSub.add(subTitle.toLowerCase());
+        let subTitle = String(rawSubTitle || "").trim();
+        subTitle =
+          iconStyle === "emoji_both"
+            ? subTitle.replace(/^(?:\d{2,}[\s.、·-]+|[◆▸■•★▪❖➤]\s*)/u, "").trim()
+            : stripVisualDecorations(subTitle);
+        const subDedupKey = stripVisualDecorations(subTitle).toLowerCase();
+        if (!subTitle || !subDedupKey || seenSub.has(subDedupKey)) return;
+        seenSub.add(subDedupKey);
 
         const rawSeeds = Array.isArray(sub && sub.seedSamples) ? sub.seedSamples : [];
         const seedSamples = rawSeeds
@@ -489,8 +524,8 @@ ${fullInventoryLines.join("\n")}
       hostFolderCounts: new Map(),
       ipHostFolderCounts: new Map(),
       styleProfile: {
-        mainUsesEmoji: iconStyle === "emoji",
-        subUsesEmoji: false
+        mainUsesEmoji: iconStyle === "emoji" || iconStyle === "emoji_both",
+        subUsesEmoji: iconStyle === "emoji_both"
       }
     };
   }
@@ -1077,6 +1112,105 @@ ${itemLines.join("\n")}
     });
   }
 
+  /**
+   * 纯本地零请求估算单次智能整理或全盘重构的 Token 消耗规模与请求批次数。
+   * 仅基于书签体量、规则命中率与目录树规模进行经验估算，不硬编码各厂商动态价格。
+   */
+  function estimateReorganizeTokens({
+    mode = "existing",
+    bookmarks = [],
+    rules: userRules = [],
+    treeAnalysis = null,
+    aiConfig = {},
+    preferences = {}
+  } = {}) {
+    const list = Array.isArray(bookmarks) ? bookmarks : [];
+    const totalBookmarks = list.length;
+    const activeCfg = resolveActiveProviderConfig(aiConfig);
+    const hasCredential = Boolean(
+      activeCfg.baseUrl && (activeCfg.apiKey || activeCfg.provider === "ollama")
+    );
+    const aiEnabled = Boolean(activeCfg.enabled && hasCredential);
+    const isLocalFree = activeCfg.provider === "ollama";
+
+    if (totalBookmarks === 0) {
+      return {
+        totalBookmarks: 0,
+        ruleMatchedCount: 0,
+        aiCount: 0,
+        batchCount: 0,
+        estimatedTokens: 0,
+        isLocalFree,
+        aiEnabled,
+        providerLabel: activeCfg.providerLabel,
+        model: activeCfg.model
+      };
+    }
+
+    const folderCount =
+      (treeAnalysis && Array.isArray(treeAnalysis.folders) && treeAnalysis.folders.length) || 8;
+    const folderSummaryTokens = Math.min(900, Math.max(80, folderCount * 28));
+    const BATCH_SIZE = 12;
+
+    if (mode === "rebuild") {
+      const stage1Tokens = 700 + Math.min(totalBookmarks, 600) * 28 + 900;
+      const mappingBatches = Math.ceil(totalBookmarks / BATCH_SIZE);
+      const batchTokens = mappingBatches * (550 + folderSummaryTokens) + totalBookmarks * 160;
+      return {
+        totalBookmarks,
+        ruleMatchedCount: 0,
+        aiCount: totalBookmarks,
+        batchCount: 1 + mappingBatches,
+        estimatedTokens: stage1Tokens + batchTokens,
+        isLocalFree,
+        aiEnabled,
+        providerLabel: activeCfg.providerLabel,
+        model: activeCfg.model
+      };
+    }
+
+    let ruleMatchedCount = 0;
+    for (const bm of list) {
+      if (matchRuleEngine(bm.url, userRules)) {
+        ruleMatchedCount++;
+      }
+    }
+
+    const unhandledCount = Math.max(0, totalBookmarks - ruleMatchedCount);
+    if (!aiEnabled) {
+      return {
+        totalBookmarks,
+        ruleMatchedCount,
+        aiCount: 0,
+        batchCount: 0,
+        estimatedTokens: 0,
+        isLocalFree,
+        aiEnabled: false,
+        providerLabel: activeCfg.providerLabel,
+        model: activeCfg.model
+      };
+    }
+
+    const ruleAiTitle = Boolean(preferences && preferences.ruleMatchUseAiTitle);
+    const ruleTitleTokens = ruleAiTitle ? ruleMatchedCount * 220 : 0;
+    const batchCount = unhandledCount > 0 ? Math.ceil(unhandledCount / BATCH_SIZE) : 0;
+    const batchTokens =
+      batchCount * (550 + folderSummaryTokens) + unhandledCount * 160;
+    const totalRequests = batchCount + (ruleAiTitle ? ruleMatchedCount : 0);
+
+    return {
+      totalBookmarks,
+      ruleMatchedCount,
+      aiCount: unhandledCount,
+      batchCount: totalRequests,
+      estimatedTokens: batchTokens + ruleTitleTokens,
+      isLocalFree,
+      aiEnabled: true,
+      providerLabel: activeCfg.providerLabel,
+      model: activeCfg.model
+    };
+  }
+
   // 聚合导出统一的 MarkFlowEngine 门面对象
   global.MarkFlowEngine = Object.assign(
     {},
@@ -1099,7 +1233,8 @@ ${itemLines.join("\n")}
       translateDomainMemoryToBlueprint,
       migrateDomainMemoryAfterRebuild,
       classifySinglePage,
-      classifyBatchBookmarks
+      classifyBatchBookmarks,
+      estimateReorganizeTokens
     }
   );
 })(typeof window !== "undefined" ? window : globalThis);

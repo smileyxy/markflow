@@ -31,6 +31,7 @@
       syncStaticTooltips();
       if (ctx.updateProviderUiMeta) ctx.updateProviderUiMeta(appState.aiConfig.provider);
       if (ctx.syncReorgStartButtonLabel) ctx.syncReorgStartButtonLabel();
+      if (ctx.updateReorgTokenEstimate) ctx.updateReorgTokenEstimate();
       if (ctx.renderRulesTable) ctx.renderRulesTable();
       if (ctx.refreshMemoryCountLabel) ctx.refreshMemoryCountLabel();
       if (ctx.syncCustomSelects) ctx.syncCustomSelects();
@@ -53,6 +54,7 @@
     if (tabId === "tab-reorganize") {
       if (ctx.populateReorgFolderSelect) ctx.populateReorgFolderSelect();
       if (ctx.renderLockedFoldersChecklist) ctx.renderLockedFoldersChecklist();
+      if (ctx.updateReorgTokenEstimate) ctx.updateReorgTokenEstimate();
     } else if (tabId === "tab-preferences") {
       if (ctx.refreshMemoryCountLabel) ctx.refreshMemoryCountLabel();
     }

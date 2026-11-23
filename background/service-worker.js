@@ -55,10 +55,10 @@ const DEFAULT_UNIVERSAL_RULES = [
 const DEFAULT_SETTINGS = {
   aiConfig: {
     enabled: false,
-    provider: "siliconflow",
+    provider: "deepseek",
     apiKey: "",
-    baseUrl: "https://api.siliconflow.cn/v1",
-    model: "deepseek-ai/DeepSeek-V4.1-Flash",
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-flash",
     autoCleanTitle: true,
     temperature: 0
   },
@@ -73,6 +73,7 @@ const DEFAULT_SETTINGS = {
     extractPageContext: true,
     subfolderPolicy: "balanced",
     ruleMatchUseAiTitle: false,
+    reorgSortRule: "smart",
     customInstruction: ""
   }
 };

@@ -49,13 +49,21 @@
   }
 
   /**
-   * 对同一目录下的书签数组执行三级优先级排序。
+   * 对同一目录下的书签数组执行多规则优先级排序。
+   * 支持 5 种排序模式：
+   * - smart: 功能聚簇 → 同站点/局域网端口紧邻 → 自然标题
+   * - site: 同站点/局域网端口紧邻（大站优先）→ 自然标题
+   * - title_asc: 标题自然序 A → Z（兼容中文与数字）
+   * - newest: 最新收藏优先（按 dateAdded 降序）
+   * - oldest: 最早收藏优先（按 dateAdded 升序）
    * @param {Array<Object>} items 书签项列表
+   * @param {string} [sortRule="smart"] 排序规则标识
    * @returns {Array<Object>} 排序后的新数组
    */
-  function sortFolderBookmarksByPriority(items) {
+  function sortFolderBookmarksByPriority(items, sortRule = "smart") {
     if (!Array.isArray(items) || items.length <= 1) return items || [];
 
+    const rule = sortRule || "smart";
     const enriched = items.map((item, origIdx) => {
       const u = parseUrlInfo(item.url);
       const funcGroup =
@@ -67,6 +75,7 @@
         : "other";
       const portNum = u.port ? parseInt(u.port, 10) : 0;
       const titleKey = (item.cleanTitle || item.title || "").trim();
+      const dateAdded = Number(item.dateAdded || 0);
 
       return {
         item,
@@ -75,7 +84,8 @@
         siteClusterKey,
         hostname: u.hostname || "",
         portNum: Number.isFinite(portNum) ? portNum : 0,
-        titleKey
+        titleKey,
+        dateAdded: Number.isFinite(dateAdded) ? dateAdded : 0
       };
     });
 
@@ -91,8 +101,49 @@
       sensitivity: "base"
     });
 
+    const compareBySiteAndTitle = (a, b) => {
+      if (a.siteClusterKey !== b.siteClusterKey) {
+        const scDiff =
+          (siteCounts.get(b.siteClusterKey) || 0) - (siteCounts.get(a.siteClusterKey) || 0);
+        if (scDiff !== 0) return scDiff;
+        const skCmp = collator.compare(a.siteClusterKey, b.siteClusterKey);
+        if (skCmp !== 0) return skCmp;
+      }
+      if (a.hostname !== b.hostname) {
+        const hCmp = collator.compare(a.hostname, b.hostname);
+        if (hCmp !== 0) return hCmp;
+      }
+      if (a.portNum !== b.portNum) {
+        return a.portNum - b.portNum;
+      }
+      const tCmp = collator.compare(a.titleKey, b.titleKey);
+      if (tCmp !== 0) return tCmp;
+      return a.origIdx - b.origIdx;
+    };
+
     enriched.sort((a, b) => {
-      // 第一优先级：功能聚簇（大聚簇靠前，“常规条目”置后）
+      if (rule === "title_asc") {
+        const tCmp = collator.compare(a.titleKey, b.titleKey);
+        return tCmp !== 0 ? tCmp : a.origIdx - b.origIdx;
+      }
+
+      if (rule === "newest") {
+        if (a.dateAdded !== b.dateAdded) return b.dateAdded - a.dateAdded;
+        const tCmp = collator.compare(a.titleKey, b.titleKey);
+        return tCmp !== 0 ? tCmp : a.origIdx - b.origIdx;
+      }
+
+      if (rule === "oldest") {
+        if (a.dateAdded !== b.dateAdded) return a.dateAdded - b.dateAdded;
+        const tCmp = collator.compare(a.titleKey, b.titleKey);
+        return tCmp !== 0 ? tCmp : a.origIdx - b.origIdx;
+      }
+
+      if (rule === "site") {
+        return compareBySiteAndTitle(a, b);
+      }
+
+      // 默认 smart 模式：功能聚簇 → 同站点与端口紧邻 → 自然标题顺序
       if (a.funcGroup !== b.funcGroup) {
         if (a.funcGroup === "常规条目") return 1;
         if (b.funcGroup === "常规条目") return -1;
@@ -102,27 +153,7 @@
         if (fgCmp !== 0) return fgCmp;
       }
 
-      // 第二优先级：同站点或同局域网主机紧邻，内部按子域名与端口号升序排列
-      if (a.siteClusterKey !== b.siteClusterKey) {
-        const scDiff =
-          (siteCounts.get(b.siteClusterKey) || 0) - (siteCounts.get(a.siteClusterKey) || 0);
-        if (scDiff !== 0) return scDiff;
-        const skCmp = collator.compare(a.siteClusterKey, b.siteClusterKey);
-        if (skCmp !== 0) return skCmp;
-      }
-
-      if (a.hostname !== b.hostname) {
-        const hCmp = collator.compare(a.hostname, b.hostname);
-        if (hCmp !== 0) return hCmp;
-      }
-      if (a.portNum !== b.portNum) {
-        return a.portNum - b.portNum;
-      }
-
-      // 第三优先级：自然标题顺序
-      const tCmp = collator.compare(a.titleKey, b.titleKey);
-      if (tCmp !== 0) return tCmp;
-      return a.origIdx - b.origIdx;
+      return compareBySiteAndTitle(a, b);
     });
 
     return enriched.map(e => e.item);

@@ -63,11 +63,11 @@
 ## 🚀 核心能力
 
 ### 1. 智能整理与目录架构重构
-- **归入现有目录 & 内部排序**：保留你熟悉的文件夹骨架，批量清洗标题、纠偏错位书签，并按 **P1 同功能聚簇 → P2 同站点/端口紧邻 → P3 自然序** 重排每个目录内的书签顺序。
-- **0 Token 极速纯重排**：不消耗任何 AI 额度，直接基于本地功能分组与域名/端口聚类对现有目录完成顺序整理。
+- **归入现有目录 & 多规则排序**：保留你熟悉的文件夹骨架，批量清洗标题、纠偏错位书签，支持 **5 种排序规则**（*智能分层聚簇*、*站点域名与端口分组*、*标题 A → Z 升序*、*最新优先*、*最早优先*），并默认开启 **「仅展示并调整有变动项」**，避免无谓改动已整齐的书签。
+- **0 Token 极速纯重排**：不消耗任何 AI 额度，直接按选定排序规则对现有目录完成本地顺序整理。
 - **两阶段全盘目录重构**：
-  1. **蓝图设计阶段**：AI 分析全量书签分布并生成精炼的两级目录草案，支持锁定特定一级目录（保持原封不动）、自由改名或增删节点；
-  2. **原子落地阶段**：批量映射归位、自动收拢单条孤岛子目录、按优先级重排并安全清理迁空的旧文件夹。
+  1. **蓝图设计阶段**：AI 分析全量书签分布并生成两级目录草案，支持 **5 种视觉前缀风格**（单层图标、双层图标、纯文字、数字编号 `01`、几何符号 `◆`），可锁定特定一级目录或自由微调节点；
+  2. **原子落地阶段**：运行前提供本地 **0 请求 Token 估算**；确认后批量映射归位、自动收拢孤岛子目录、按规则排序并清理迁空旧目录。
 - **双重安全兜底**：控制台顶部随时可「手动备份书签」，且每次确认应用变更前自动下载带时间戳的标准 Netscape HTML 备份文件。
 
 ### 2. 本地智能规则引擎
@@ -89,16 +89,19 @@
 
 ## 🤖 支持的 AI 服务商
 
-所有服务商的端点、密钥与模型均 **独立持久化保存**，切换服务商不会覆盖已有配置，并支持一键从接口实时拉取可用 `/models` 列表：
+所有服务商的端点、密钥与模型均 **独立持久化保存**，切换服务商不会覆盖已有配置，并支持一键拉取实时 `/models` 列表与按厂商/家族折叠筛选：
 
 | 服务商 | 接口协议 | 典型推荐模型 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI 项目端点 | `gemini-3.8-flash` / `gemini-3.5-flash` | 内置 **Gemini API**、**Vertex AI Express**（`aiplatform.googleapis.com/v1/publishers/google`）与 **Vertex AI 项目/区域端点** 一键预设，自动识别 API Key 或 `Bearer` / `ya29.` OAuth Token；填入 `/v1` 或 `/openai` 中转地址自动切换兼容模式 |
+| **DeepSeek** | OpenAI Compatible | `deepseek-flash` / `deepseek-v4-pro` | 默认推荐服务商，中文技术与多语言语义分类稳定 |
 | **SiliconFlow (硅基流动)** | OpenAI Compatible | `DeepSeek-V4.1-Flash` / `Qwen3.5-35B-A3B` | 国内直连高速响应，高性价比 |
-| **DeepSeek** | OpenAI Compatible | `deepseek-flash` / `deepseek-v4-pro` | 中文技术与通用场景表现稳定 |
+| **OpenRouter** | OpenAI Compatible | `google/gemini-2.5-flash` / `anthropic/claude-sonnet-4` | 聚合 100+ 顶级模型，列表自动按模型厂商分组折叠展示 |
+| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI 项目端点 | `gemini-3.8-flash` / `gemini-3.5-flash` | 内置 **Gemini API**、**Vertex AI Express** 与 **Vertex AI 项目/区域端点** 一键预设（自动识别 API Key / `ya29.` OAuth，并在受限密钥下提供内置官方模型目录兜底） |
+| **Claude (Anthropic)** | Anthropic Messages (`/v1/messages`) | `claude-sonnet-4-5` / `claude-haiku-4-5` | 原生支持 Anthropic Messages 接口与浏览器直连 CORS 头 |
 | **OpenAI** | OpenAI Compatible | `gpt-6-luna` / `gpt-6.1-terra` | 全球通用高稳定端点 |
-| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.5:9b` / `gemma4:12b` | 100% 本地离线运行，无需 API Key |
-| **Custom Endpoint** | OpenAI / Gemini / Vertex | 任意自定义模型 ID | 兼容 OpenRouter、自建中转、Vertex 代理或企业内网网关 |
+| **Grok (xAI)** | OpenAI Compatible | `grok-3-mini` / `grok-4-fast` | 官方 xAI 接口直连支持 |
+| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.5:9b` / `gemma4:12b` | 100% 本地离线运行，无需 API Key，零 Token 费用 |
+| **Custom Endpoint** | OpenAI / Anthropic / Gemini / Vertex | 任意自定义模型 ID | 兼容自建中转、企业内网网关或任意第三方代理端点 |
 
 ---
 
