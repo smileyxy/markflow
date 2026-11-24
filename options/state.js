@@ -31,6 +31,11 @@
 
     // 在线拉取的模型列表缓存
     fetchedModelIds: [],
+    fetchedModelsCacheKey: "",
+    fetchedModelsIsFallback: false,
+    fetchedModelsIsProbed: false,
+    customVertexModels: [],
+    modelPickerActiveGroup: "ALL",
 
     // 智能整理与目录重构状态
     reorgMode: "existing",        // "existing" | "rebuild"
@@ -52,7 +57,13 @@
   /** 从本地存储与 Chrome 书签树初始化控制台全量状态 */
   async function loadState() {
     const [stored, tree] = await Promise.all([
-      chrome.storage.local.get(["aiConfig", "rules", "preferences", "domainMemory"]),
+      chrome.storage.local.get([
+        "aiConfig",
+        "rules",
+        "preferences",
+        "domainMemory",
+        "customVertexModels"
+      ]),
       chrome.bookmarks.getTree()
     ]);
 
@@ -71,12 +82,15 @@
     appState.preferences.language = resolveDisplayLanguage(appState.preferences.language);
 
     appState.domainMemory = stored.domainMemory || {};
+    appState.customVertexModels = Array.isArray(stored.customVertexModels)
+      ? stored.customVertexModels
+      : [];
 
     // 各服务商独立持久化配置，并在未自定义密钥时平滑迁移旧版默认模型名
     const storedAi = stored.aiConfig || {};
     appState.aiConfig = {
       enabled: !!storedAi.enabled,
-      provider: storedAi.provider || "siliconflow",
+      provider: storedAi.provider || "deepseek",
       providers: {}
     };
 
@@ -149,20 +163,34 @@
     return hierarchy;
   }
 
+  /** 将大模型异常提炼为克制且用户可读的本地化错误说明，完整详情仅记入控制台 */
+  function formatFriendlyAiError(err) {
+    console.warn("[MarkFlow AI Error]", err);
+    const info = MarkFlowEngine.classifyAiError(err);
+    if (info.code !== "generic") {
+      return t(info.summaryKey);
+    }
+    return info.excerpt || t("pop_ai_err_generic");
+  }
+
   /** 显示右上角浮动带图标 Toast 通知 */
   function showToast(msg, isError = false) {
     const alertEl = document.getElementById("toastAlert");
     const iconSvg = isError
       ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
       : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
-    alertEl.innerHTML = `${iconSvg}<span>${MarkFlowEngine.escapeHtml(msg)}</span>`;
+    alertEl.innerHTML = `${iconSvg}<span class="toast-text">${MarkFlowEngine.escapeHtml(msg)}</span>`;
     alertEl.className = `toast-alert ${isError ? "toast-error" : "toast-success"}`;
     alertEl.classList.remove("hidden");
+    alertEl.onclick = () => {
+      clearTimeout(showToast._timer);
+      alertEl.classList.add("hidden");
+    };
 
     clearTimeout(showToast._timer);
     showToast._timer = setTimeout(() => {
       alertEl.classList.add("hidden");
-    }, 3800);
+    }, isError ? 5200 : 3800);
   }
 
   /** 弹出应用内确认对话框，返回 Promise<boolean> */
@@ -204,6 +232,7 @@
     t,
     loadState,
     parseFolderStructures,
+    formatFriendlyAiError,
     showToast,
     showConfirmModal
   };

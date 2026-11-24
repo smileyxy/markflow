@@ -15,7 +15,7 @@
         <img src="../icons/icon48.png" alt="MarkFlow" class="brand-logo">
         <div class="brand-info">
           <h1 class="brand-name">MarkFlow</h1>
-          <span class="brand-version">v1.0.0</span>
+          <span class="brand-version">v1.1.0</span>
         </div>
         <a
           id="linkSidebarGithub"
@@ -195,7 +195,7 @@
                 <div class="sort-option-main">
                   <label class="sort-checkbox-label">
                     <input type="checkbox" id="chkSortInFolders" checked>
-                    <span data-i18n="reorg_sort_toggle_label">同步按优先级重排目录内顺序（同功能聚簇 → 同站点/端口紧邻 → 自然序）</span>
+                    <span data-i18n="reorg_sort_toggle_label">同步按优先级重排目录内顺序</span>
                   </label>
                   <div class="sort-rule-inline">
                     <label for="selReorgSortRule" class="sort-rule-label" data-i18n="reorg_sort_rule_label">排序规则：</label>
@@ -311,6 +311,18 @@
               </div>
             </div>
 
+            <div id="reorgBatchErrorBanner" class="reorg-error-banner hidden" role="alert">
+              <div class="reorg-error-banner-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span id="reorgBatchErrorText"></span>
+              </div>
+              <button id="btnRetryFailedReorg" class="btn btn-sm reorg-retry-btn" type="button"></button>
+            </div>
+
             <div class="reorg-preview-toolbar">
               <label class="sort-checkbox-label">
                 <input type="checkbox" id="chkPreviewChangedOnly" checked>
@@ -322,14 +334,14 @@
             <div id="reorgCategoryStatsBar" class="reorg-stats-bar"></div>
 
             <div class="table-container" style="max-height: 480px; overflow-y: auto;">
-              <table class="rules-table">
+              <table class="rules-table reorg-preview-table">
                 <thead>
                   <tr>
-                    <th style="width: 240px;" data-i18n="th_preview_orig">原标题 / URL</th>
-                    <th style="width: 240px;" data-i18n="th_preview_clean">整理后标题（可直接编辑）</th>
-                    <th style="width: 140px;" data-i18n="th_preview_cur">当前所在目录</th>
-                    <th style="width: 220px;" data-i18n="th_preview_dest">建议目标目录（可更换）</th>
-                    <th style="width: 64px; text-align: right;" data-i18n="th_preview_skip">跳过</th>
+                    <th style="width: 24%;" data-i18n="th_preview_orig">原标题 / URL</th>
+                    <th style="width: 39%;" data-i18n="th_preview_clean">整理后标题（可直接编辑）</th>
+                    <th style="width: 14%;" data-i18n="th_preview_cur">当前所在目录</th>
+                    <th style="width: 18%;" data-i18n="th_preview_dest">建议目标目录（可更换）</th>
+                    <th style="width: 52px; text-align: right;" data-i18n="th_preview_skip">跳过</th>
                   </tr>
                 </thead>
                 <tbody id="reorgPreviewTableBody"></tbody>
@@ -361,35 +373,35 @@
             <div class="provider-grid" id="providerPresetGrid">
               <button class="preset-btn active" data-provider="deepseek" type="button">
                 <span class="preset-name">DeepSeek</span>
-                <span class="preset-tag">V4.1 Flash / Reasoner</span>
+                <span class="preset-tag">V4-Pro / V4.1-Flash</span>
               </button>
               <button class="preset-btn" data-provider="siliconflow" type="button">
                 <span class="preset-name">SiliconFlow</span>
-                <span class="preset-tag">DeepSeek V4.1 / Qwen3.5</span>
+                <span class="preset-tag">V4-Pro / V4.1-Flash / GLM-5.3</span>
               </button>
               <button class="preset-btn" data-provider="openrouter" type="button">
                 <span class="preset-name">OpenRouter</span>
-                <span class="preset-tag">Multi-Model Gateway</span>
+                <span class="preset-tag">Gemini 4 / Claude 5.5 / GPT-6.2</span>
               </button>
               <button class="preset-btn" data-provider="gemini" type="button">
                 <span class="preset-name">Google Gemini</span>
-                <span class="preset-tag">Gemini API / Vertex AI</span>
+                <span class="preset-tag">Gemini 4 / 3.8 Flash · Vertex AI</span>
               </button>
               <button class="preset-btn" data-provider="claude" type="button">
                 <span class="preset-name">Claude (Anthropic)</span>
-                <span class="preset-tag">Claude 4.5 Sonnet / Haiku</span>
+                <span class="preset-tag">Claude 5.5 Opus / Haiku</span>
               </button>
               <button class="preset-btn" data-provider="openai" type="button">
                 <span class="preset-name">OpenAI</span>
-                <span class="preset-tag">GPT-6 Luna / Terra</span>
+                <span class="preset-tag">GPT-6.2 Astra / Luna</span>
               </button>
               <button class="preset-btn" data-provider="grok" type="button">
                 <span class="preset-name">Grok (xAI)</span>
-                <span class="preset-tag">Grok 4 / 3 Mini</span>
+                <span class="preset-tag">Grok 4.7 / 4.7-Fast / 4.3</span>
               </button>
               <button class="preset-btn" data-provider="ollama" type="button">
                 <span class="preset-name">Ollama (Local)</span>
-                <span class="preset-tag">Qwen3.5 / Gemma4</span>
+                <span class="preset-tag">Qwen3.8 / Gemma4 / Qwen3.5</span>
               </button>
               <button class="preset-btn" data-provider="custom" type="button">
                 <span class="preset-name">Custom Endpoint</span>
@@ -433,18 +445,8 @@
             <input type="text" id="inputModel" class="form-input font-mono" placeholder="deepseek-ai/DeepSeek-V4.1-Flash">
 
             <div id="modelQuickChipsContainer" class="quick-models-bar hidden">
-              <span class="quick-models-label" data-i18n="ai_quick_models_label">高性价比推荐：</span>
+              <span class="quick-models-label" data-i18n="ai_quick_models_label">推荐模型：</span>
               <div id="modelQuickChips" class="quick-models-list"></div>
-            </div>
-
-            <div id="fetchedModelsPanel" class="fetched-models-panel hidden">
-              <div class="fetched-models-header">
-                <input type="text" id="fetchedModelsFilter" class="form-input" data-i18n-placeholder="ai_fetched_filter_ph" placeholder="输入关键词过滤模型..." style="padding:6px 10px; font-size:12px;">
-                <button id="btnCloseFetchedModels" class="modal-close-btn" type="button" title="Close">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-              </div>
-              <div id="fetchedModelsList" class="fetched-models-list"></div>
             </div>
           </div>
 
@@ -972,6 +974,47 @@
       </div>
       <div class="lightbox-body">
         <img id="guideLightboxImg" src="" alt="Preview" class="lightbox-img">
+      </div>
+    </div>
+  </div>
+
+  <!-- 接口可用模型双栏选择弹窗 -->
+  <div id="modelPickerModal" class="modal-overlay hidden">
+    <div class="modal-card model-picker-modal-card">
+      <div class="modal-header model-picker-header">
+        <div class="model-picker-title-row">
+          <h3 id="modelPickerTitle" data-i18n="ai_picker_title">选择可用模型</h3>
+          <span id="modelPickerTotalBadge" class="model-picker-total-badge">0</span>
+        </div>
+        <div class="model-picker-header-actions">
+          <button id="btnRefreshModels" class="model-picker-icon-btn" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            <span data-i18n="ai_picker_refresh">刷新</span>
+          </button>
+          <button id="btnCloseModelPicker" class="modal-close-btn" type="button" title="Close">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="model-picker-search-bar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="modelPickerSearch" class="model-picker-search-input" data-i18n-placeholder="ai_fetched_filter_ph" placeholder="输入关键词过滤模型（如 flash / luna / qwen）...">
+        <button id="btnClearModelSearch" class="model-picker-clear-btn hidden" type="button" title="Clear">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="model-picker-body">
+        <aside id="modelPickerGroups" class="model-picker-sidebar"></aside>
+        <div id="modelPickerList" class="model-picker-list"></div>
       </div>
     </div>
   </div>

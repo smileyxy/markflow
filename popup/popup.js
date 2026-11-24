@@ -25,6 +25,8 @@ let existingBookmark = null;
 let undoState = null;
 let countdownTimer = null;
 let cachedPageContext = undefined;
+let aiRequestInFlight = false;
+let lastAiRetryContext = null; // { mode: "classify" | "title" }
 
 // 目录筛选下拉状态
 let comboOpen = false;
@@ -55,6 +57,78 @@ function showPopupError(message) {
   showPopupError._timer = setTimeout(() => {
     strip.classList.add("hidden");
   }, 4500);
+}
+
+function buildLocalCleanTitle(rawTitle) {
+  let clean = rawTitle || "";
+  if (preferences.stripSuffixes) {
+    clean = MarkFlowEngine.cleanTitleLocally(clean);
+  }
+  if (preferences.panguSpacing !== false) {
+    clean = MarkFlowEngine.addPanguSpacing(clean);
+  }
+  return clean;
+}
+
+function openAiSettingsTab() {
+  chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#tab-ai") });
+  window.close();
+}
+
+function classifyPopupAiError(err) {
+  return MarkFlowEngine.classifyAiError(err);
+}
+
+function showAiFailureStrip(err, retryContext) {
+  const strip = document.getElementById("aiErrorStrip");
+  if (!strip) return;
+
+  lastAiRetryContext = retryContext || { mode: "classify" };
+  const info = classifyPopupAiError(err);
+
+  const summaryEl = document.getElementById("aiErrorSummaryText");
+  const detailEl = document.getElementById("aiErrorDetailBox");
+  const toggleBtn = document.getElementById("btnAiErrorToggle");
+
+  if (summaryEl) summaryEl.textContent = t(info.summaryKey);
+  if (detailEl) {
+    const cleanDetail = MarkFlowEngine.sanitizeErrorExcerpt(info.raw, 240);
+    detailEl.textContent = cleanDetail || t(info.summaryKey);
+    detailEl.classList.add("hidden");
+  }
+  if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+
+  strip.classList.toggle("is-config-primary", Boolean(info.preferConfig));
+  strip.classList.remove("hidden");
+}
+
+function hideAiFailureStrip() {
+  const strip = document.getElementById("aiErrorStrip");
+  const detailEl = document.getElementById("aiErrorDetailBox");
+  const toggleBtn = document.getElementById("btnAiErrorToggle");
+  if (strip) {
+    strip.classList.add("hidden");
+    strip.classList.remove("is-config-primary");
+  }
+  if (detailEl) detailEl.classList.add("hidden");
+  if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+  lastAiRetryContext = null;
+}
+
+function setAiControlsBusy(isBusy) {
+  aiRequestInFlight = Boolean(isBusy);
+  ["btnAiTitlePolish", "btnReanalyzeAI", "btnAiRetry"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = aiRequestInFlight;
+  });
+}
+
+function pauseAutoSaveOnAiFailure() {
+  stopCountdown();
+  if (!existingBookmark && preferences.autoSaveCountdown > 0) {
+    const label = document.getElementById("countdownLabel");
+    if (label) label.textContent = t("pop_hint_autosave_paused");
+  }
 }
 
 function isBlankOrUtilityTab(url) {
@@ -150,13 +224,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // 本地预处理网页标题
-  let localCleanTitle = currentTab.title || "";
-  if (preferences.stripSuffixes) {
-    localCleanTitle = MarkFlowEngine.cleanTitleLocally(localCleanTitle);
-  }
-  if (preferences.panguSpacing !== false) {
-    localCleanTitle = MarkFlowEngine.addPanguSpacing(localCleanTitle);
-  }
+  const localCleanTitle = buildLocalCleanTitle(currentTab.title || "");
   document.getElementById("inputTitle").value = localCleanTitle;
 
   // 精确去重检查：若当前网址已存在，则进入就地编辑模式
@@ -311,20 +379,18 @@ function enterDuplicateEditMode(bm, rules = []) {
 }
 
 async function runSingleAiTitlePolish() {
-  if (!isAiConfigured() || !currentTab) return;
-  const btn = document.getElementById("btnAiTitlePolish");
+  if (!isAiConfigured() || !currentTab || aiRequestInFlight) return;
   const titleInput = document.getElementById("inputTitle");
   stopCountdown();
+  hideAiFailureStrip();
+  setAiControlsBusy(true);
 
-  btn.disabled = true;
   titleInput.classList.add("is-shimmering");
   setBadge("ai", t("pop_badge_ai_naming"));
 
   try {
     const folder = treeAnalysis && treeAnalysis.folderMap.get(String(selectedFolderId));
-    let localClean = currentTab.title || titleInput.value;
-    if (preferences.stripSuffixes) localClean = MarkFlowEngine.cleanTitleLocally(localClean);
-    if (preferences.panguSpacing !== false) localClean = MarkFlowEngine.addPanguSpacing(localClean);
+    const localClean = buildLocalCleanTitle(currentTab.title || titleInput.value);
 
     const polished = await MarkFlowEngine.generateCleanTitleOnly({
       url: currentTab.url,
@@ -341,22 +407,27 @@ async function runSingleAiTitlePolish() {
       titleInput.value = polished;
       userEditedTitle = false;
     }
-    setBadge("ai", t("pop_badge_rule_ai"));
+    setBadge("ai", t("pop_badge_ai_named"));
   } catch (err) {
     console.warn("AI title polish failed:", err);
-    showPopupError(err.message || "AI request failed");
-    setBadge("idle", t("pop_badge_ready"));
+    showAiFailureStrip(err, { mode: "title" });
+    setBadge("error", t("pop_badge_ai_failed"));
+    pauseAutoSaveOnAiFailure();
   } finally {
-    btn.disabled = false;
+    setAiControlsBusy(false);
     titleInput.classList.remove("is-shimmering");
   }
 }
 
 async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = false) {
+  if (aiRequestInFlight) return;
   const reasonEl = document.getElementById("folderMatchedReason");
   const onboardingEl = document.getElementById("aiOnboardingStrip");
   const titleInput = document.getElementById("inputTitle");
+  const folderTrigger = document.getElementById("folderComboTrigger");
   if (onboardingEl) onboardingEl.classList.add("hidden");
+  hideAiFailureStrip();
+  reasonEl.classList.remove("is-muted");
 
   const aiReady = isAiConfigured();
 
@@ -373,6 +444,8 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
       if (preferences.ruleMatchUseAiTitle && aiReady) {
         setBadge("ai", t("pop_badge_ai_naming"));
         titleInput.classList.add("is-shimmering");
+        setAiControlsBusy(true);
+        let titleFailed = false;
         try {
           const polished = await MarkFlowEngine.generateCleanTitleOnly({
             url: currentTab.url,
@@ -389,11 +462,16 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
           }
           setBadge("ai", t("pop_badge_rule_ai"));
         } catch (err) {
+          titleFailed = true;
           console.warn("Rule-match AI title naming fallback:", err);
-          setBadge("rule", t("pop_badge_rule"));
+          setBadge("error", t("pop_badge_ai_failed"));
+          showAiFailureStrip(err, { mode: "title" });
+          pauseAutoSaveOnAiFailure();
         } finally {
+          setAiControlsBusy(false);
           titleInput.classList.remove("is-shimmering");
         }
+        if (titleFailed) return;
       } else {
         setBadge("rule", t("pop_badge_rule"));
       }
@@ -411,7 +489,7 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
     treeAnalysis,
     domainMemory
   );
-  if (domainAffinity && !userChangedFolder && !existingBookmark) {
+  if (domainAffinity && !userChangedFolder && !existingBookmark && !forceAI) {
     setSelectedFolder(domainAffinity.folderId, false);
     reasonEl.textContent = `${t("pop_badge_domain")}: ${domainAffinity.reason}`;
   }
@@ -419,9 +497,12 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
   // 第三阶段：AI 语义分类
   const activeCfg = MarkFlowEngine.resolveActiveProviderConfig(aiConfig);
   if (aiReady) {
+    stopCountdown();
+    setAiControlsBusy(true);
     setBadge("ai", t("pop_badge_ai_loading"));
     reasonEl.textContent = cachedPageContext ? t("pop_reason_ai_deep") : t("pop_reason_ai_calling");
     titleInput.classList.add("is-shimmering");
+    if (folderTrigger) folderTrigger.classList.add("is-shimmering");
 
     try {
       const result = await MarkFlowEngine.classifySinglePage({
@@ -438,19 +519,25 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
 
       if (result.title && (!userEditedTitle || forceAI)) {
         titleInput.value = result.title;
+        if (forceAI) userEditedTitle = false;
       }
 
       if (result.folderId && (!userChangedFolder || forceAI)) {
         aiRecommendedFolderId = result.folderId;
         setSelectedFolder(result.folderId, false);
+        if (forceAI) userChangedFolder = false;
+        reasonEl.classList.remove("is-muted");
         reasonEl.textContent = result.reason || t("pop_reason_ai_matched");
       }
 
       const providerNames = {
-        siliconflow: "SiliconFlow",
-        gemini: "Gemini",
         deepseek: "DeepSeek",
+        siliconflow: "SiliconFlow",
+        openrouter: "OpenRouter",
+        gemini: "Gemini",
+        claude: "Claude",
         openai: "OpenAI",
+        grok: "Grok",
         ollama: "Ollama"
       };
       const shortProvider = providerNames[activeCfg.provider] || "AI";
@@ -469,16 +556,22 @@ async function runClassificationPipeline(localCleanTitle, rules = [], forceAI = 
       }
     } catch (err) {
       console.warn("AI classification fallback:", err);
+      setBadge("error", t("pop_badge_ai_failed"));
+      showAiFailureStrip(err, { mode: "classify" });
+      reasonEl.classList.add("is-muted");
       if (domainAffinity) {
-        setBadge("rule", t("pop_badge_domain"));
-        reasonEl.textContent = domainAffinity.reason;
+        if (!userChangedFolder && !existingBookmark) {
+          setSelectedFolder(domainAffinity.folderId, false);
+        }
+        reasonEl.textContent = t("pop_reason_domain_fallback", { reason: domainAffinity.reason });
       } else {
-        setBadge("idle", t("pop_badge_default"));
-        reasonEl.textContent = t("pop_reason_ai_fallback");
+        reasonEl.textContent = t("pop_reason_default_fallback");
       }
-      if (!existingBookmark) startCountdown(preferences.autoSaveCountdown);
+      pauseAutoSaveOnAiFailure();
     } finally {
+      setAiControlsBusy(false);
       titleInput.classList.remove("is-shimmering");
+      if (folderTrigger) folderTrigger.classList.remove("is-shimmering");
     }
   } else {
     if (onboardingEl && !existingBookmark) {
@@ -519,7 +612,9 @@ function setSelectedFolder(folderId, isManualUserAction = false) {
     userChangedFolder = true;
     stopCountdown();
     hideSubfolderSuggestion();
-    document.getElementById("folderMatchedReason").textContent = t("pop_reason_manual");
+    const reasonEl = document.getElementById("folderMatchedReason");
+    reasonEl.classList.remove("is-muted");
+    reasonEl.textContent = t("pop_reason_manual");
     document.querySelectorAll(".alt-pill").forEach(btn => {
       btn.classList.toggle("active", btn.getAttribute("data-fid") === folder.id);
     });
@@ -1048,9 +1143,35 @@ function bindEvents() {
 
   const btnGoSetupAI = document.getElementById("btnGoSetupAI");
   if (btnGoSetupAI) {
-    btnGoSetupAI.addEventListener("click", () => {
-      chrome.tabs.create({ url: chrome.runtime.getURL("options/options.html#tab-ai") });
-      window.close();
+    btnGoSetupAI.addEventListener("click", openAiSettingsTab);
+  }
+
+  const btnAiConfig = document.getElementById("btnAiConfig");
+  if (btnAiConfig) {
+    btnAiConfig.addEventListener("click", openAiSettingsTab);
+  }
+
+  const btnAiErrorToggle = document.getElementById("btnAiErrorToggle");
+  if (btnAiErrorToggle) {
+    btnAiErrorToggle.addEventListener("click", () => {
+      const detailBox = document.getElementById("aiErrorDetailBox");
+      if (!detailBox) return;
+      const expanded = detailBox.classList.toggle("hidden") === false;
+      btnAiErrorToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    });
+  }
+
+  const btnAiRetry = document.getElementById("btnAiRetry");
+  if (btnAiRetry) {
+    btnAiRetry.addEventListener("click", () => {
+      if (aiRequestInFlight || !currentTab) return;
+      const ctx = lastAiRetryContext || { mode: "classify" };
+      if (ctx.mode === "title") {
+        runSingleAiTitlePolish();
+      } else {
+        const rawClean = buildLocalCleanTitle(currentTab.title || "");
+        runClassificationPipeline(rawClean, activeRules, true);
+      }
     });
   }
 
@@ -1061,8 +1182,9 @@ function bindEvents() {
 
   document.getElementById("btnDeleteExisting").addEventListener("click", deleteExistingBookmark);
   document.getElementById("btnReanalyzeAI").addEventListener("click", () => {
-    const rawClean = MarkFlowEngine.cleanTitleLocally(currentTab.title || "");
-    runClassificationPipeline(rawClean, [], true);
+    if (aiRequestInFlight || !currentTab) return;
+    const rawClean = buildLocalCleanTitle(currentTab.title || "");
+    runClassificationPipeline(rawClean, activeRules, true);
   });
 
   document.getElementById("btnUndo").addEventListener("click", async () => {
@@ -1157,6 +1279,9 @@ function bindEvents() {
       }
 
       if (e.key === "Enter") {
+        if (document.activeElement && document.activeElement.tagName === "BUTTON") {
+          return;
+        }
         e.preventDefault();
         saveBookmark();
       } else if (e.key === "Escape") {

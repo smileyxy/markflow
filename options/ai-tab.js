@@ -8,7 +8,7 @@
   "use strict";
 
   const ctx = global.MarkFlowOptions;
-  const { DEFAULT_PROVIDERS, appState, t, showToast } = ctx;
+  const { DEFAULT_PROVIDERS, appState, t, showToast, formatFriendlyAiError } = ctx;
   const { escapeHtml } = MarkFlowEngine;
 
   function initAiTab() {
@@ -54,7 +54,7 @@
         inputApiKey.value = nextCfg.apiKey || "";
         inputModel.value = nextCfg.model || "";
 
-        document.getElementById("fetchedModelsPanel").classList.add("hidden");
+        document.getElementById("modelPickerModal").classList.add("hidden");
         updateProviderUiMeta(targetProvider);
       });
     });
@@ -66,10 +66,104 @@
       inputApiKey.type = inputApiKey.type === "password" ? "text" : "password";
     });
 
+    async function fetchAndStoreModels({ provider, baseUrl, apiKey, currentModel = "", forceRefresh = false }) {
+      const cacheKey = `${provider}|${baseUrl}|${apiKey}`;
+      if (!forceRefresh && appState.fetchedModelsCacheKey === cacheKey && appState.fetchedModelIds.length > 0) {
+        return {
+          models: appState.fetchedModelIds,
+          fromCache: true,
+          isFallbackCatalog: appState.fetchedModelsIsFallback,
+          isVertexProbed: appState.fetchedModelsIsProbed
+        };
+      }
+
+      const models = await MarkFlowEngine.fetchAvailableModels({
+        provider,
+        baseUrl,
+        apiKey,
+        currentModel,
+        extraModels: appState.customVertexModels || []
+      });
+      if (!models.length) {
+        return {
+          models: [],
+          fromCache: false,
+          isFallbackCatalog: false,
+          isVertexProbed: false
+        };
+      }
+
+      appState.fetchedModelIds = models;
+      appState.fetchedModelsCacheKey = cacheKey;
+      appState.fetchedModelsIsFallback = Boolean(models.isFallbackCatalog);
+      appState.fetchedModelsIsProbed = Boolean(models.isVertexProbed);
+      return {
+        models,
+        fromCache: false,
+        isFallbackCatalog: appState.fetchedModelsIsFallback,
+        isVertexProbed: appState.fetchedModelsIsProbed
+      };
+    }
+
+    function openModelPickerModal() {
+      const modal = document.getElementById("modelPickerModal");
+      const titleEl = document.getElementById("modelPickerTitle");
+      const totalBadge = document.getElementById("modelPickerTotalBadge");
+      const searchInput = document.getElementById("modelPickerSearch");
+      const clearBtn = document.getElementById("btnClearModelSearch");
+      const providerKey = appState.aiConfig.provider || "deepseek";
+      const preset =
+        MarkFlowEngine.PROVIDER_PRESETS[providerKey] || MarkFlowEngine.PROVIDER_PRESETS.deepseek;
+
+      if (titleEl) {
+        titleEl.textContent = `${t("ai_picker_title")} · ${preset.name}`;
+      }
+      if (totalBadge) {
+        totalBadge.textContent = String(appState.fetchedModelIds.length);
+      }
+      if (searchInput) searchInput.value = "";
+      if (clearBtn) clearBtn.classList.add("hidden");
+
+      const { entries, groups } = buildModelPickerGroups(
+        appState.fetchedModelIds,
+        t("ai_picker_other")
+      );
+      const currentVal = inputModel.value.trim();
+      const matchedEntry = currentVal ? entries.find(e => e.id === currentVal) : null;
+      const targetGroupKey = matchedEntry ? matchedEntry.displayGroupKey : "ALL";
+      const hasGroup = groups.some(g => g.key === targetGroupKey);
+      appState.modelPickerActiveGroup = hasGroup ? targetGroupKey : "ALL";
+
+      modal.classList.remove("hidden");
+      renderModelPickerModal();
+
+      const selectedEl = document.querySelector("#modelPickerList .model-picker-item.is-selected");
+      if (selectedEl && typeof selectedEl.scrollIntoView === "function") {
+        selectedEl.scrollIntoView({ block: "nearest" });
+      }
+      if (searchInput) searchInput.focus();
+    }
+
+    function closeModelPickerModal() {
+      const modal = document.getElementById("modelPickerModal");
+      if (modal) modal.classList.add("hidden");
+    }
+
+    const resolveModelsToast = result => {
+      if (result.isVertexProbed) {
+        return t("ai_toast_vertex_probed", { count: result.models.length });
+      }
+      if (result.isFallbackCatalog) {
+        return t("ai_toast_vertex_catalog", { count: result.models.length });
+      }
+      return t("ai_toast_fetched", { count: result.models.length });
+    };
+
     document.getElementById("btnFetchModels").addEventListener("click", async () => {
       const provider = appState.aiConfig.provider || "deepseek";
       const baseUrl = inputBaseUrl.value.trim();
       const apiKey = inputApiKey.value.trim();
+      const currentModel = inputModel.value.trim();
 
       if (!baseUrl || (!apiKey && provider !== "ollama")) {
         showToast(t("ai_toast_need_url_key"), true);
@@ -78,35 +172,101 @@
 
       const fetchBtn = document.getElementById("btnFetchModels");
       fetchBtn.disabled = true;
+      fetchBtn.classList.add("is-spinning");
 
       try {
-        const models = await MarkFlowEngine.fetchAvailableModels({ provider, baseUrl, apiKey });
-        if (!models.length) {
+        const result = await fetchAndStoreModels({
+          provider,
+          baseUrl,
+          apiKey,
+          currentModel,
+          forceRefresh: false
+        });
+        if (!result.models.length) {
           showToast(t("ai_toast_no_models"), true);
           return;
         }
-        appState.fetchedModelIds = models;
-        document.getElementById("fetchedModelsFilter").value = "";
-        renderFetchedModelsList("");
-        document.getElementById("fetchedModelsPanel").classList.remove("hidden");
-        showToast(
-          models.isFallbackCatalog
-            ? t("ai_toast_vertex_catalog", { count: models.length })
-            : t("ai_toast_fetched", { count: models.length })
-        );
+        openModelPickerModal();
+        if (!result.fromCache) {
+          showToast(resolveModelsToast(result));
+        }
       } catch (err) {
-        showToast(t("ai_toast_fetch_err", { msg: err.message }), true);
+        showToast(t("ai_toast_fetch_err", { msg: formatFriendlyAiError(err) }), true);
       } finally {
         fetchBtn.disabled = false;
+        fetchBtn.classList.remove("is-spinning");
       }
     });
 
-    document.getElementById("fetchedModelsFilter").addEventListener("input", e => {
-      renderFetchedModelsList(e.target.value);
+    document.getElementById("btnRefreshModels").addEventListener("click", async () => {
+      const provider = appState.aiConfig.provider || "deepseek";
+      const baseUrl = inputBaseUrl.value.trim();
+      const apiKey = inputApiKey.value.trim();
+      const currentModel = inputModel.value.trim();
+
+      if (!baseUrl || (!apiKey && provider !== "ollama")) {
+        showToast(t("ai_toast_need_url_key"), true);
+        return;
+      }
+
+      const refreshBtn = document.getElementById("btnRefreshModels");
+      refreshBtn.disabled = true;
+      refreshBtn.classList.add("is-spinning");
+
+      try {
+        const result = await fetchAndStoreModels({
+          provider,
+          baseUrl,
+          apiKey,
+          currentModel,
+          forceRefresh: true
+        });
+        if (!result.models.length) {
+          showToast(t("ai_toast_no_models"), true);
+          return;
+        }
+        const totalBadge = document.getElementById("modelPickerTotalBadge");
+        if (totalBadge) totalBadge.textContent = String(result.models.length);
+        renderModelPickerModal();
+        showToast(resolveModelsToast(result));
+      } catch (err) {
+        showToast(t("ai_toast_fetch_err", { msg: formatFriendlyAiError(err) }), true);
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.classList.remove("is-spinning");
+      }
     });
 
-    document.getElementById("btnCloseFetchedModels").addEventListener("click", () => {
-      document.getElementById("fetchedModelsPanel").classList.add("hidden");
+    const searchInput = document.getElementById("modelPickerSearch");
+    const clearSearchBtn = document.getElementById("btnClearModelSearch");
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        renderModelPickerModal();
+      });
+    }
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener("click", () => {
+        if (searchInput) {
+          searchInput.value = "";
+          searchInput.focus();
+        }
+        renderModelPickerModal();
+      });
+    }
+
+    document.getElementById("btnCloseModelPicker").addEventListener("click", closeModelPickerModal);
+    document.getElementById("modelPickerModal").addEventListener("click", e => {
+      if (e.target && e.target.id === "modelPickerModal") {
+        closeModelPickerModal();
+      }
+    });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("modelPickerModal");
+        if (modal && !modal.classList.contains("hidden")) {
+          closeModelPickerModal();
+        }
+      }
     });
 
     document.getElementById("btnSaveAI").addEventListener("click", async () => {
@@ -146,18 +306,9 @@
 
       try {
         await MarkFlowEngine.testAIConnection({ provider, baseUrl, apiKey, model });
-        const proto = MarkFlowEngine.detectProtocol(provider, baseUrl);
-        const protoTag =
-          proto === "anthropic"
-            ? "Anthropic Claude"
-            : proto === "vertex"
-              ? "Vertex AI"
-              : proto === "gemini"
-                ? "Gemini Native"
-                : "OpenAI Compatible";
-        showToast(t("ai_toast_test_ok", { proto: protoTag }));
+        showToast(t("ai_toast_test_ok"));
       } catch (err) {
-        showToast(t("ai_toast_test_err", { msg: err.message }), true);
+        showToast(t("ai_toast_test_err", { msg: formatFriendlyAiError(err) }), true);
       } finally {
         testBtn.disabled = false;
         testBtn.querySelector("span").textContent = t("btn_test_ai");
@@ -216,14 +367,17 @@
 
     chipsList.innerHTML = "";
     if (preset.quickModels && preset.quickModels.length > 0) {
-      preset.quickModels.forEach(m => {
+      const currentModelVal = inputModel.value.trim();
+      preset.quickModels.forEach(entry => {
+        const modelId = typeof entry === "string" ? entry : entry.id;
         const chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "model-chip-btn" + (inputModel.value.trim() === m ? " active" : "");
-        chip.textContent = m;
+        chip.dataset.modelId = modelId;
+        chip.className = "model-chip-btn" + (currentModelVal === modelId ? " active" : "");
+        chip.textContent = modelId;
         chip.addEventListener("click", () => {
-          inputModel.value = m;
-          syncActiveModelChip(m);
+          inputModel.value = modelId;
+          syncActiveModelChip(modelId);
         });
         chipsList.appendChild(chip);
       });
@@ -245,122 +399,442 @@
     });
   }
 
-  /**
-   * 按模型厂商前缀或型号家族将模型 ID 归类分组，便于在折叠手风琴面板中浏览与筛选。
-   */
-  function groupFetchedModelIds(ids) {
-    const VENDOR_NAMES = {
-      google: "Google",
-      anthropic: "Anthropic",
-      openai: "OpenAI",
-      deepseek: "DeepSeek",
-      "x-ai": "xAI",
-      meta: "Meta Llama",
-      "meta-llama": "Meta Llama",
-      qwen: "Qwen",
-      mistralai: "Mistral",
-      cohere: "Cohere"
-    };
+  const VENDOR_ALIASES = {
+    "deepseek-ai": "DeepSeek",
+    deepseek: "DeepSeek",
+    qwen: "Qwen",
+    alibaba: "Qwen",
+    "zai-org": "GLM (Zhipu)",
+    thudm: "GLM (Zhipu)",
+    "z-ai": "GLM (Zhipu)",
+    zhipu: "GLM (Zhipu)",
+    zhipuai: "GLM (Zhipu)",
+    google: "Google",
+    anthropic: "Anthropic",
+    openai: "OpenAI",
+    "x-ai": "xAI",
+    xai: "xAI",
+    meta: "Meta Llama",
+    "meta-llama": "Meta Llama",
+    mistralai: "Mistral",
+    mistral: "Mistral",
+    moonshotai: "Moonshot",
+    moonshot: "Moonshot",
+    minimax: "MiniMax",
+    minimaxai: "MiniMax",
+    baidu: "Baidu",
+    "baidu-ernie": "Baidu",
+    bytedance: "ByteDance",
+    "bytedance-seed": "ByteDance",
+    doubao: "ByteDance",
+    tencent: "Tencent",
+    internlm: "InternLM",
+    shanghai_ai_lab: "InternLM",
+    stepfun: "StepFun",
+    "stepfun-ai": "StepFun",
+    cohere: "Cohere",
+    cohereforai: "Cohere",
+    nvidia: "NVIDIA",
+    microsoft: "Microsoft",
+    perplexity: "Perplexity",
+    "01-ai": "01.AI",
+    "baichuan-inc": "Baichuan",
+    baichuan: "Baichuan",
+    inclusionai: "InclusionAI",
+    kwai: "Kwai",
+    kwaipilot: "Kwai",
+    nousresearch: "Nous Research",
+    allenai: "AllenAI"
+  };
 
-    const resolveGroup = rawId => {
-      const s = String(rawId || "").trim();
-      if (s.includes("/")) {
-        const prefix = s.split("/")[0].toLowerCase();
-        if (VENDOR_NAMES[prefix]) return VENDOR_NAMES[prefix];
-        return prefix.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      }
-      const low = s.toLowerCase();
-      if (/gemini-4/i.test(low)) return "Gemini 4.x";
-      if (/gemini-3/i.test(low)) return "Gemini 3.x";
-      if (/gemini-2\.5/i.test(low)) return "Gemini 2.5";
-      if (/gemini-2/i.test(low)) return "Gemini 2.0";
-      if (/claude-.*4|claude-4/i.test(low)) return "Claude 4.x";
-      if (/claude-3/i.test(low)) return "Claude 3.x";
-      if (/claude/i.test(low)) return "Claude";
-      if (/gpt-6/i.test(low)) return "GPT-6";
-      if (/gpt-5/i.test(low)) return "GPT-5";
-      if (/gpt-4/i.test(low)) return "GPT-4";
-      if (/^o[134](-|$)/i.test(low)) return "o-Series";
-      if (/grok-4/i.test(low)) return "Grok 4";
-      if (/grok-3/i.test(low)) return "Grok 3";
-      if (/deepseek/i.test(low)) return "DeepSeek";
-      if (/qwen/i.test(low)) return "Qwen";
-      if (/llama/i.test(low)) return "Llama";
-      if (/glm/i.test(low)) return "GLM";
-      return "Other";
-    };
+  const GROUP_PRIORITY = [
+    "DeepSeek",
+    "Qwen",
+    "GLM (Zhipu)",
+    "Google",
+    "Anthropic",
+    "OpenAI",
+    "xAI",
+    "Meta Llama",
+    "Mistral",
+    "Moonshot",
+    "MiniMax",
+    "ByteDance",
+    "Baidu",
+    "Tencent"
+  ];
 
-    const map = new Map();
-    for (const id of ids) {
-      const groupName = resolveGroup(id);
-      if (!map.has(groupName)) map.set(groupName, []);
-      map.get(groupName).push(id);
+  function resolveGroupSortTuple(key, itemCount) {
+    const prioIdx = GROUP_PRIORITY.indexOf(key);
+    if (prioIdx !== -1) {
+      return [0, prioIdx, -itemCount];
     }
-
-    return Array.from(map.entries()).map(([name, models]) => ({ name, models }));
+    let m;
+    if ((m = /^Gemini (\d+(?:\.\d+)?)/i.exec(key))) {
+      return [100, -parseFloat(m[1]), -itemCount];
+    }
+    if ((m = /^Claude(?: (\d+(?:\.\d+)?))?/i.exec(key))) {
+      return [101, m[1] ? -parseFloat(m[1]) : 0, -itemCount];
+    }
+    if ((m = /^GPT-(\d+(?:\.\d+)?)/i.exec(key))) {
+      return [102, -parseFloat(m[1]), -itemCount];
+    }
+    if (key === "o-Series") {
+      return [103, 0, -itemCount];
+    }
+    if ((m = /^Grok (\d+(?:\.\d+)?)/i.exec(key))) {
+      return [104, -parseFloat(m[1]), -itemCount];
+    }
+    return [999, 0, -itemCount];
   }
 
-  function renderFetchedModelsList(filterText) {
-    const listEl = document.getElementById("fetchedModelsList");
-    const inputModel = document.getElementById("inputModel");
-    listEl.innerHTML = "";
-    listEl.classList.add("fetched-models-groups");
+  /**
+   * 识别通道前缀（如 Pro/、Free/、LoRA/）与后缀标签（:free / :thinking），
+   * 剥离修饰前缀后归一化模型所属厂商与动态世代家族。
+   */
+  function parseModelEntry(rawId) {
+    const id = String(rawId || "").trim();
+    const badges = [];
+    const seenBadges = new Set();
 
-    const q = (filterText || "").trim().toLowerCase();
-    const matched = appState.fetchedModelIds.filter(id => !q || id.toLowerCase().includes(q));
+    const addBadge = (text, tone) => {
+      const k = text.toLowerCase();
+      if (!seenBadges.has(k)) {
+        seenBadges.add(k);
+        badges.push({ text, tone });
+      }
+    };
 
-    if (matched.length === 0) {
-      listEl.innerHTML = `<span class="text-muted" style="font-size:12px; padding:4px;">${escapeHtml(
-        t("ai_fetched_empty")
-      )}</span>`;
-      return;
+    let working = id;
+    while (true) {
+      const m = working.match(/^(Pro|LoRA|Free|Vendor-[A-Z0-9-]+)\/(.+)$/i);
+      if (!m) break;
+      const tag = m[1];
+      working = m[2];
+      if (/^pro$/i.test(tag)) addBadge("Pro", "pro");
+      else if (/^free$/i.test(tag)) addBadge("Free", "free");
+      else if (/^lora$/i.test(tag)) addBadge("LoRA", "neutral");
+      else addBadge(tag, "neutral");
     }
 
-    const currentVal = inputModel.value.trim();
-    const groups = groupFetchedModelIds(matched);
+    const colonIdx = working.lastIndexOf(":");
+    if (colonIdx > 0) {
+      const suffix = working.slice(colonIdx + 1).toLowerCase();
+      if (/^(free|thinking|extended|beta)$/.test(suffix)) {
+        working = working.slice(0, colonIdx);
+        if (suffix === "free") addBadge("Free", "free");
+        else if (suffix === "thinking") addBadge("Thinking", "reason");
+        else if (suffix === "extended") addBadge("Extended", "neutral");
+        else if (suffix === "beta") addBadge("Beta", "neutral");
+      }
+    }
 
-    groups.forEach((grp, gIdx) => {
-      const details = document.createElement("details");
-      details.className = "model-group-accordion";
-      const hasCurrent = currentVal && grp.models.includes(currentVal);
-      if (q.length > 0 || gIdx < 2 || hasCurrent) {
-        details.open = true;
+    let groupKey = "__OTHER__";
+    let shortName = working;
+
+    if (working.includes("/")) {
+      const slashIdx = working.indexOf("/");
+      const vendorRaw = working.slice(0, slashIdx).toLowerCase();
+      shortName = working.slice(working.lastIndexOf("/") + 1) || working;
+      groupKey =
+        VENDOR_ALIASES[vendorRaw] ||
+        vendorRaw.replace(/[-_]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    } else {
+      const low = working.toLowerCase();
+      let fm;
+      if ((fm = /^gemini-(\d+(?:\.\d+)?)/i.exec(low))) {
+        const ver = fm[1];
+        const major = ver.split(".")[0];
+        if (ver.startsWith("2.5")) groupKey = "Gemini 2.5";
+        else if (major === "2") groupKey = "Gemini 2.0";
+        else groupKey = `Gemini ${major}.x`;
+      } else if ((fm = /^claude-(?:[a-z]+-)?(\d+)/i.exec(low))) {
+        groupKey = `Claude ${fm[1]}.x`;
+      } else if (/^claude/i.test(low)) {
+        groupKey = "Claude";
+      } else if ((fm = /^gpt-(\d+)/i.exec(low))) {
+        groupKey = `GPT-${fm[1]}`;
+      } else if (/^o[134](-|$)/i.test(low)) {
+        groupKey = "o-Series";
+      } else if ((fm = /^grok-(\d+)/i.exec(low))) {
+        groupKey = `Grok ${fm[1]}`;
+      } else if (/deepseek/i.test(low)) {
+        groupKey = "DeepSeek";
+      } else if (/qwen/i.test(low)) {
+        groupKey = "Qwen";
+      } else if (/(?:^|[-_])(glm|chatglm)/i.test(low)) {
+        groupKey = "GLM (Zhipu)";
+      } else if (/llama/i.test(low)) {
+        groupKey = "Meta Llama";
+      } else if (/ernie/i.test(low)) {
+        groupKey = "Baidu";
+      }
+    }
+
+    if (
+      !seenBadges.has("thinking") &&
+      /(?:^|[-_/])(r1|qwq|reasoner|thinking)(?:[-_./:]|$)|^o[134](?:-|$)/i.test(shortName)
+    ) {
+      addBadge("Reasoning", "reason");
+    }
+    if (/-preview(?:[-_./:]|$)/i.test(shortName)) {
+      addBadge("Preview", "neutral");
+    }
+
+    const searchParts = [
+      id,
+      shortName,
+      groupKey === "__OTHER__" ? "" : groupKey,
+      ...badges.map(b => b.text)
+    ];
+
+    return {
+      id,
+      displayName: shortName || id,
+      groupKey,
+      displayGroupKey: groupKey,
+      badges,
+      searchText: searchParts.join(" ").toLowerCase()
+    };
+  }
+
+  /**
+   * 按厂商与热门程度整理模型分组；当分组数超过 10 个时，将排名 10 之后仅 1 条模型的冷门厂商归入「其他」。
+   */
+  function buildModelPickerGroups(rawIds, otherLabel = "Other") {
+    const entries = (Array.isArray(rawIds) ? rawIds : []).map(parseModelEntry);
+    const groupMap = new Map();
+
+    for (const entry of entries) {
+      if (!groupMap.has(entry.groupKey)) {
+        groupMap.set(entry.groupKey, []);
+      }
+      groupMap.get(entry.groupKey).push(entry);
+    }
+
+    const rawOther = groupMap.get("__OTHER__") || [];
+    groupMap.delete("__OTHER__");
+
+    const nonOtherGroups = Array.from(groupMap.entries()).map(([key, items]) => ({
+      key,
+      label: key,
+      items
+    }));
+
+    nonOtherGroups.sort((a, b) => {
+      const ta = resolveGroupSortTuple(a.key, a.items.length);
+      const tb = resolveGroupSortTuple(b.key, b.items.length);
+      for (let i = 0; i < ta.length; i++) {
+        if (ta[i] !== tb[i]) return ta[i] - tb[i];
+      }
+      return a.key.localeCompare(b.key);
+    });
+
+    const groups = [];
+    const otherBucket = [...rawOther];
+    const shouldFoldTail = nonOtherGroups.length > 10;
+
+    nonOtherGroups.forEach((grp, idx) => {
+      if (shouldFoldTail && idx >= 10 && grp.items.length === 1) {
+        otherBucket.push(...grp.items);
+      } else {
+        grp.items.forEach(item => {
+          item.displayGroupKey = grp.key;
+        });
+        groups.push(grp);
+      }
+    });
+
+    if (otherBucket.length > 0) {
+      otherBucket.forEach(item => {
+        item.displayGroupKey = "__OTHER__";
+      });
+      groups.push({
+        key: "__OTHER__",
+        label: otherLabel || "Other",
+        items: otherBucket
+      });
+    }
+
+    return { entries, groups };
+  }
+
+  function renderModelPickerModal() {
+    const sidebarEl = document.getElementById("modelPickerGroups");
+    const listEl = document.getElementById("modelPickerList");
+    const searchInput = document.getElementById("modelPickerSearch");
+    const clearBtn = document.getElementById("btnClearModelSearch");
+    const inputModel = document.getElementById("inputModel");
+    if (!sidebarEl || !listEl) return;
+
+    const q = (searchInput ? searchInput.value : "").trim().toLowerCase();
+    if (clearBtn) {
+      clearBtn.classList.toggle("hidden", q.length === 0);
+    }
+
+    const { entries, groups } = buildModelPickerGroups(
+      appState.fetchedModelIds,
+      t("ai_picker_other")
+    );
+    const matchedEntries = entries.filter(item => !q || item.searchText.includes(q));
+
+    const matchedByGroup = new Map();
+    for (const item of matchedEntries) {
+      const k = item.displayGroupKey;
+      if (!matchedByGroup.has(k)) matchedByGroup.set(k, []);
+      matchedByGroup.get(k).push(item);
+    }
+
+    const visibleGroups = groups
+      .map(grp => ({
+        key: grp.key,
+        label: grp.label,
+        filteredItems: matchedByGroup.get(grp.key) || []
+      }))
+      .filter(grp => q.length === 0 || grp.filteredItems.length > 0);
+
+    if (
+      appState.modelPickerActiveGroup !== "ALL" &&
+      !visibleGroups.some(g => g.key === appState.modelPickerActiveGroup)
+    ) {
+      appState.modelPickerActiveGroup = "ALL";
+    }
+
+    const sidebarFrag = document.createDocumentFragment();
+    const makeGroupBtn = (key, label, count) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "model-picker-group-btn" + (appState.modelPickerActiveGroup === key ? " is-active" : "");
+      btn.innerHTML = `<span class="model-picker-group-name">${escapeHtml(label)}</span><span class="model-picker-group-count">${count}</span>`;
+      btn.addEventListener("click", () => {
+        appState.modelPickerActiveGroup = key;
+        renderModelPickerModal();
+        listEl.scrollTop = 0;
+      });
+      return btn;
+    };
+
+    sidebarFrag.appendChild(makeGroupBtn("ALL", t("ai_picker_all"), matchedEntries.length));
+    for (const grp of visibleGroups) {
+      sidebarFrag.appendChild(makeGroupBtn(grp.key, grp.label, grp.filteredItems.length));
+    }
+    sidebarEl.replaceChildren(sidebarFrag);
+
+    const activeGroupObj =
+      appState.modelPickerActiveGroup === "ALL"
+        ? null
+        : visibleGroups.find(g => g.key === appState.modelPickerActiveGroup);
+    const itemsToRender = activeGroupObj ? activeGroupObj.filteredItems : matchedEntries;
+
+    const currentVal = inputModel ? inputModel.value.trim() : "";
+    const listFrag = document.createDocumentFragment();
+
+    if (itemsToRender.length === 0) {
+      const emptyEl = document.createElement("div");
+      emptyEl.className = "model-picker-empty";
+      const emptyMsg = document.createElement("span");
+      emptyMsg.textContent = t("ai_fetched_empty");
+      emptyEl.appendChild(emptyMsg);
+
+      const rawQuery = searchInput ? searchInput.value.trim() : "";
+      const providerKey = appState.aiConfig.provider || "deepseek";
+      const baseUrlInput = document.getElementById("inputBaseUrl");
+      const apiKeyInput = document.getElementById("inputApiKey");
+      const baseUrlVal = baseUrlInput ? baseUrlInput.value.trim() : "";
+      const apiKeyVal = apiKeyInput ? apiKeyInput.value.trim() : "";
+
+      if (rawQuery && MarkFlowEngine.detectProtocol(providerKey, baseUrlVal) === "vertex") {
+        const probeBtn = document.createElement("button");
+        probeBtn.type = "button";
+        probeBtn.className = "model-picker-probe-btn";
+        probeBtn.textContent = t("ai_picker_probe_custom", { model: rawQuery });
+        probeBtn.addEventListener("click", async () => {
+          probeBtn.disabled = true;
+          try {
+            const verifiedId = await MarkFlowEngine.probeSingleVertexModel({
+              baseUrl: baseUrlVal,
+              apiKey: apiKeyVal,
+              modelId: rawQuery
+            });
+            if (!Array.isArray(appState.customVertexModels)) appState.customVertexModels = [];
+            if (!appState.customVertexModels.includes(verifiedId)) {
+              appState.customVertexModels.push(verifiedId);
+              await chrome.storage.local.set({ customVertexModels: appState.customVertexModels });
+            }
+            if (!appState.fetchedModelIds.includes(verifiedId)) {
+              appState.fetchedModelIds = [verifiedId, ...appState.fetchedModelIds];
+            }
+            const totalBadge = document.getElementById("modelPickerTotalBadge");
+            if (totalBadge) totalBadge.textContent = String(appState.fetchedModelIds.length);
+            if (inputModel) inputModel.value = verifiedId;
+            syncActiveModelChip(verifiedId);
+            const modal = document.getElementById("modelPickerModal");
+            if (modal) modal.classList.add("hidden");
+            showToast(t("ai_toast_probe_custom_ok", { model: verifiedId }));
+          } catch (err) {
+            probeBtn.disabled = false;
+            showToast(
+              t("ai_toast_probe_custom_err", { model: rawQuery, msg: formatFriendlyAiError(err) }),
+              true
+            );
+          }
+        });
+        emptyEl.appendChild(probeBtn);
       }
 
-      const summary = document.createElement("summary");
-      summary.className = "model-group-summary";
-      summary.innerHTML = `<span>${escapeHtml(grp.name)}</span><span class="model-group-count">${grp.models.length}</span>`;
+      listFrag.appendChild(emptyEl);
+    } else {
+      const checkSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
 
-      const chipWrap = document.createElement("div");
-      chipWrap.className = "model-group-chips";
-
-      grp.models.forEach(m => {
+      for (const entry of itemsToRender) {
+        const isSelected = currentVal === entry.id;
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "model-chip-btn" + (currentVal === m ? " active" : "");
-        btn.textContent = m;
-        btn.addEventListener("click", () => {
-          inputModel.value = m;
-          syncActiveModelChip(m);
-        });
-        chipWrap.appendChild(btn);
-      });
+        btn.className = "model-picker-item" + (isSelected ? " is-selected" : "");
 
-      details.appendChild(summary);
-      details.appendChild(chipWrap);
-      listEl.appendChild(details);
-    });
+        const badgesHtml = entry.badges
+          .map(b => `<span class="model-badge model-badge-${b.tone}">${escapeHtml(b.text)}</span>`)
+          .join("");
+        const selectedHtml = isSelected
+          ? `<span class="model-picker-selected-tag">${checkSvg}<span>${escapeHtml(
+              t("ai_picker_selected")
+            )}</span></span>`
+          : "";
+
+        btn.innerHTML = `
+          <div class="model-picker-item-main">
+            <div class="model-picker-item-head">
+              <span class="model-picker-item-name">${escapeHtml(entry.displayName)}</span>
+              ${badgesHtml}
+            </div>
+            <span class="model-picker-item-id">${escapeHtml(entry.id)}</span>
+          </div>
+          ${selectedHtml}
+        `;
+
+        btn.addEventListener("click", () => {
+          if (inputModel) inputModel.value = entry.id;
+          syncActiveModelChip(entry.id);
+          const modal = document.getElementById("modelPickerModal");
+          if (modal) modal.classList.add("hidden");
+        });
+        listFrag.appendChild(btn);
+      }
+    }
+
+    listEl.replaceChildren(listFrag);
   }
 
   function syncActiveModelChip(currentModelVal) {
     document.querySelectorAll("#modelQuickChips .model-chip-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.textContent === currentModelVal);
-    });
-    document.querySelectorAll("#fetchedModelsList .model-chip-btn").forEach(btn => {
-      btn.classList.toggle("active", btn.textContent === currentModelVal);
+      const chipId = btn.dataset.modelId || btn.textContent;
+      btn.classList.toggle("active", chipId === currentModelVal);
     });
   }
 
   ctx.initAiTab = initAiTab;
   ctx.updateProviderUiMeta = updateProviderUiMeta;
+  ctx.parseModelEntry = parseModelEntry;
+  ctx.buildModelPickerGroups = buildModelPickerGroups;
 })(window);

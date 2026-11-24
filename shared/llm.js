@@ -10,15 +10,120 @@
 
   const { PROVIDER_PRESETS } = global.MarkFlowModules.constants;
 
-  /** Vertex AI Express 等受限凭证无法枚举官方列表时的常用模型兜底目录 */
+  /** 构造携带 HTTP 状态码的接口异常，便于上层精准归因 */
+  function createApiError(message, status) {
+    const err = new Error(message);
+    if (status) err.status = status;
+    return err;
+  }
+
+  /** 裁剪并脱敏接口报错正文：去掉冗长的配额指标说明与文档外链，保留简短可读原因 */
+  function sanitizeErrorExcerpt(raw, maxLen = 110) {
+    const src = String(raw || "").trim();
+    if (!src) return "";
+
+    let text = src
+      .replace(
+        /(?:\b(?:For more information|To monitor your current|See\s+https?:\/\/|Please retry in)|\*\s*Quota exceeded)[\s\S]*/i,
+        ""
+      )
+      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/\s+/g, " ")
+      .replace(/[,;:*.\s]+$/g, "")
+      .trim();
+
+    if (!text) {
+      text = src.replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim();
+    }
+    if (!text) return "";
+    return text.length > maxLen ? `${text.slice(0, maxLen).trim()}…` : text;
+  }
+
+  /** 将原始接口异常归类为用户友好的错误类别与摘要键 */
+  function classifyAiError(err) {
+    const raw = String((err && err.message) || err || "").trim();
+    const lower = raw.toLowerCase();
+    const status = Number(err && err.status) || 0;
+    const excerpt = sanitizeErrorExcerpt(raw);
+
+    if (
+      /exceeded your current quota|insufficient_quota|insufficient balance|credit balance|billing|free_tier|limit:\s*0|quota exceeded/.test(
+        lower
+      )
+    ) {
+      return { code: "quota", summaryKey: "pop_ai_err_quota", preferConfig: true, raw, excerpt };
+    }
+    if (
+      status === 401 ||
+      status === 403 ||
+      /\b(401|403)\b|unauthorized|forbidden|invalid.?api.?key|api.?key.?not.?valid|unauthenticated|permission.?denied|authentication|oauth2|api keys are not supported/.test(
+        lower
+      )
+    ) {
+      return { code: "auth", summaryKey: "pop_ai_err_auth", preferConfig: true, raw, excerpt };
+    }
+    if (
+      status === 404 ||
+      /\b404\b|not.?found|does not exist|project_id|model.*empty|not configured|publisher model/.test(
+        lower
+      )
+    ) {
+      return { code: "model", summaryKey: "pop_ai_err_model", preferConfig: true, raw, excerpt };
+    }
+    if (status === 429 || /\b429\b|rate.?limit|too many requests|resource.?exhausted/.test(lower)) {
+      return {
+        code: "rate_limit",
+        summaryKey: "pop_ai_err_rate_limit",
+        preferConfig: false,
+        raw,
+        excerpt
+      };
+    }
+    if (/abort|timeout|timed.?out/.test(lower)) {
+      return { code: "timeout", summaryKey: "pop_ai_err_timeout", preferConfig: false, raw, excerpt };
+    }
+    if (/failed to fetch|network|connection|econn|dns/.test(lower)) {
+      return { code: "network", summaryKey: "pop_ai_err_network", preferConfig: false, raw, excerpt };
+    }
+    if (
+      status >= 500 ||
+      /\b50[0234]\b|internal server|bad gateway|service unavailable|overloaded/.test(lower)
+    ) {
+      return { code: "server", summaryKey: "pop_ai_err_server", preferConfig: false, raw, excerpt };
+    }
+    if (/invalid json|empty model response/.test(lower)) {
+      return {
+        code: "response",
+        summaryKey: "pop_ai_err_response",
+        preferConfig: false,
+        raw,
+        excerpt
+      };
+    }
+    return { code: "generic", summaryKey: "pop_ai_err_generic", preferConfig: false, raw, excerpt };
+  }
+
+  /** Vertex AI Express / 官方模型库默认候选列表（覆盖 Gemini 4 / 3.x / 2.5 GA 与 Preview） */
   const VERTEX_AI_CURATED_MODELS = [
+    "gemini-4-carbon",
+    "gemini-4-argon",
+    "gemini-4-neon",
+    "gemini-4-hydrogen",
     "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-pro",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3-pro",
+    "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
+    "gemini-2.5-flash-preview-05-20",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite"
   ];
@@ -172,15 +277,15 @@
     return headers;
   }
 
-  /** 按高性价比与轻量推理优先级对远程拉取的模型 ID 排序 */
+  /** 按最新世代与高性价比优先级对远程拉取的模型 ID 排序 */
   function prioritizeModelIds(ids) {
     const unique = Array.from(new Set(ids));
     const scoreModel = id => {
       const s = id.toLowerCase();
       let score = 0;
-      if (/flash|lite|luna|mini|nano|a3b|8b|9b|turbo|haiku/i.test(s)) score += 30;
+      if (/hydrogen|flash|lite|luna|mini|nano|a3b|8b|9b|turbo|haiku|fast/i.test(s)) score += 30;
       if (
-        /gemini-4|gemini-3\.8|gemini-3\.5|gpt-6|claude-4|claude-sonnet-4|claude-haiku-4|grok-4|grok-3-mini|deepseek-v4|deepseek-flash|qwen3\.5|glm-5/i.test(
+        /gemini-[4-9]|gemini-3\.8|gemini-3\.5|gpt-[6-9]|claude-(?:[a-z]+-)?[5-9]|claude-sonnet-4|claude-haiku-4|grok-[4-9]|deepseek-v[4-9]|deepseek-flash|qwen[3-9]|glm-[5-9]/i.test(
           s
         )
       ) {
@@ -201,6 +306,97 @@
       throw new Error("Vertex AI: Please replace PROJECT_ID in Base URL with your Google Cloud project ID.");
     }
     return cleanBase;
+  }
+
+  /** 会话级 Express -> locations/global 路由映射缓存（key: cleanBase|apiKey） */
+  const vertexGlobalBaseCache = new Map();
+
+  function isOfficialVertexExpressBase(cleanBase) {
+    return /^https?:\/\/[^/]*aiplatform\.googleapis\.com\/v1(?:beta\d*)?\/publishers\/google$/i.test(
+      cleanBase || ""
+    );
+  }
+
+  function getVertexCacheKey(cleanBase, apiKey) {
+    return `${cleanBase || ""}|${(apiKey || "").trim()}`;
+  }
+
+  function getCachedVertexGlobalBase(cleanBase, apiKey) {
+    if (!isOfficialVertexExpressBase(cleanBase)) return "";
+    return vertexGlobalBaseCache.get(getVertexCacheKey(cleanBase, apiKey)) || "";
+  }
+
+  function rememberVertexGlobalBase(cleanBase, apiKey, globalBase) {
+    if (isOfficialVertexExpressBase(cleanBase) && globalBase) {
+      vertexGlobalBaseCache.set(getVertexCacheKey(cleanBase, apiKey), globalBase);
+    }
+  }
+
+  /**
+   * 当 Vertex AI Express 端点被默认路由到区域（如 locations/us-central1）并因模型仅存于 global 返回 404 时，
+   * 从 Google 错误文本中提取项目编号，推导对应的 locations/global 端点。
+   */
+  function deriveVertexGlobalBaseFromError(cleanBase, errMsg) {
+    if (!isOfficialVertexExpressBase(cleanBase)) return "";
+    const m = String(errMsg || "").match(
+      /projects\/([A-Za-z0-9._-]+)\/locations\/(?!global\b)[A-Za-z0-9._-]+\/publishers\/google/i
+    );
+    if (!m) return "";
+    return cleanBase.replace(
+      /\/publishers\/google$/i,
+      `/projects/${encodeURIComponent(m[1])}/locations/global/publishers/google`
+    );
+  }
+
+  /**
+   * 统一执行 Gemini / Vertex POST 请求：若官方 Express 端点在区域路由遇 404，则透明升级至 locations/global 并缓存。
+   */
+  async function postGeminiWithVertexRouting({
+    cleanBase,
+    apiKey,
+    encodedModel,
+    action,
+    isVertex,
+    headers,
+    body,
+    signal = null
+  }) {
+    const cachedGlobal = isVertex ? getCachedVertexGlobalBase(cleanBase, apiKey) : "";
+    let effectiveBase = cachedGlobal || cleanBase;
+    let endpoint = `${effectiveBase}/models/${encodedModel}:${action}`;
+
+    const doPost = targetEndpoint =>
+      fetch(
+        targetEndpoint,
+        signal ? { method: "POST", headers, body, signal } : { method: "POST", headers, body }
+      );
+
+    let res = await doPost(endpoint);
+    let cachedErrJson = null;
+
+    if (isVertex && res.status === 404) {
+      cachedErrJson = await res.json().catch(() => null);
+      const msg = (cachedErrJson && cachedErrJson.error && cachedErrJson.error.message) || "";
+      let fallbackBase = "";
+
+      if (effectiveBase === cleanBase) {
+        fallbackBase = deriveVertexGlobalBaseFromError(cleanBase, msg);
+        if (fallbackBase) {
+          rememberVertexGlobalBase(cleanBase, apiKey, fallbackBase);
+        }
+      } else {
+        fallbackBase = cleanBase;
+      }
+
+      if (fallbackBase && fallbackBase !== effectiveBase) {
+        effectiveBase = fallbackBase;
+        endpoint = `${effectiveBase}/models/${encodedModel}:${action}`;
+        res = await doPost(endpoint);
+        cachedErrJson = null;
+      }
+    }
+
+    return { res, endpoint, cachedErrJson };
   }
 
   function extractGeminiStyleModelIds(data) {
@@ -228,9 +424,214 @@
   }
 
   /**
+   * 静默查询 Google 官方 Gemini API 在线模型列表，用于补充最新发布的模型 ID 到 Vertex 探测候选池。
+   * 仅访问 Google 一方官方域名 generativelanguage.googleapis.com，任一错误均安全忽略并回退为空。
+   */
+  async function discoverGoogleFirstPartyModels(apiKey) {
+    const useTimeout =
+      typeof AbortController === "function" && typeof setTimeout === "function";
+    const ctrl = useTimeout ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 4000) : null;
+    try {
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+        ctrl
+          ? { method: "GET", headers: buildGeminiAuthHeaders(apiKey, false), signal: ctrl.signal }
+          : { method: "GET", headers: buildGeminiAuthHeaders(apiKey, false) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json().catch(() => ({}));
+      return extractGeminiStyleModelIds(data);
+    } catch (e) {
+      return [];
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * 针对用户手动输入的单个模型 ID，通过免费 POST :countTokens 接口实时验证是否在当前 Vertex AI 密钥下可用。
+   */
+  async function probeSingleVertexModel({ baseUrl, apiKey, modelId }) {
+    const cleanBase = resolveGeminiEndpointBase(baseUrl);
+    const cleanId = String(modelId || "")
+      .trim()
+      .replace(/^(?:publishers\/google\/)?models\//i, "")
+      .replace(/:(?:stream)?generateContent$/i, "");
+    if (!cleanId) {
+      throw new Error("Vertex AI: Model ID cannot be empty.");
+    }
+
+    const headers = buildGeminiAuthHeaders(apiKey, true);
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: "ok" }] }]
+    });
+    const useTimeout =
+      typeof AbortController === "function" && typeof setTimeout === "function";
+    const ctrl = useTimeout ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
+
+    try {
+      const { res, cachedErrJson } = await postGeminiWithVertexRouting({
+        cleanBase,
+        apiKey,
+        encodedModel: encodeURIComponent(cleanId),
+        action: "countTokens",
+        isVertex: true,
+        headers,
+        body,
+        signal: ctrl ? ctrl.signal : null
+      });
+      if (res.ok) return cleanId;
+      const errJson = cachedErrJson || (await res.json().catch(() => null));
+      const msg =
+        (errJson && errJson.error && errJson.error.message) ||
+        `HTTP ${res.status}: ${res.statusText}`;
+      throw new Error(`Vertex AI: ${msg}`);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * 针对 Google Vertex AI Express API Key 等不支持 GET /models 枚举列表的凭证，
+   * 并行调用零计费 POST :countTokens 接口实测当前密钥下可用模型；若区域路由导致 404，自动升级至 locations/global 二轮补测。
+   */
+  async function probeVertexAvailableModels({ cleanBase, apiKey, extraModels = [] }) {
+    const cleanModelId = raw =>
+      String(raw || "")
+        .trim()
+        .replace(/^(?:publishers\/google\/)?models\//i, "")
+        .replace(/:(?:stream)?generateContent$/i, "");
+
+    const candidateSet = new Set();
+    for (const raw of [...extraModels, ...VERTEX_AI_CURATED_MODELS]) {
+      const cleaned = cleanModelId(raw);
+      if (cleaned) candidateSet.add(cleaned);
+    }
+    const candidates = Array.from(candidateSet);
+    if (candidates.length === 0) return [];
+
+    const headers = buildGeminiAuthHeaders(apiKey, true);
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: "ok" }] }]
+    });
+    const useTimeout =
+      typeof AbortController === "function" && typeof setTimeout === "function";
+
+    const runProbeBatch = async (targetBase, modelIds) => {
+      const verified = [];
+      const notFound = [];
+      let discoveredGlobalBase = "";
+      let authErrorMsg = "";
+      let lastErrMsg = "";
+
+      await Promise.all(
+        modelIds.map(async modelId => {
+          const endpoint = `${targetBase}/models/${encodeURIComponent(modelId)}:countTokens`;
+          const ctrl = useTimeout ? new AbortController() : null;
+          const timer = ctrl ? setTimeout(() => ctrl.abort(), 8000) : null;
+          try {
+            const res = await fetch(
+              endpoint,
+              ctrl
+                ? { method: "POST", headers, body, signal: ctrl.signal }
+                : { method: "POST", headers, body }
+            );
+            if (res.ok) {
+              verified.push(modelId);
+              return;
+            }
+            const errJson = await res.json().catch(() => null);
+            const msg =
+              (errJson && errJson.error && errJson.error.message) ||
+              `HTTP ${res.status}: ${res.statusText}`;
+            const errStatus = (errJson && errJson.error && errJson.error.status) || "";
+            lastErrMsg = msg;
+
+            if (res.status === 404) {
+              notFound.push(modelId);
+              if (!discoveredGlobalBase && targetBase === cleanBase) {
+                discoveredGlobalBase = deriveVertexGlobalBaseFromError(cleanBase, msg);
+              }
+            }
+
+            const isCredentialErr =
+              res.status === 401 ||
+              res.status === 403 ||
+              (res.status === 400 &&
+                (/API_KEY_INVALID|UNAUTHENTICATED|PERMISSION_DENIED/i.test(errStatus) ||
+                  /api\s*key|unauthenticated|permission|credential|not supported/i.test(msg)));
+            if (isCredentialErr && !authErrorMsg) {
+              authErrorMsg = msg;
+            }
+          } catch (err) {
+            lastErrMsg = err && err.message ? err.message : String(err);
+          } finally {
+            if (timer !== null) clearTimeout(timer);
+          }
+        })
+      );
+
+      return { verified, notFound, discoveredGlobalBase, authErrorMsg, lastErrMsg };
+    };
+
+    const cachedGlobal = getCachedVertexGlobalBase(cleanBase, apiKey);
+    const initialBase = cachedGlobal || cleanBase;
+    const pass1 = await runProbeBatch(initialBase, candidates);
+
+    const verifiedIds = [...pass1.verified];
+    let authErrorMsg = pass1.authErrorMsg;
+    let lastErrMsg = pass1.lastErrMsg;
+    let ranPass2 = false;
+    let pass2NotFound = 0;
+
+    if (initialBase === cleanBase && pass1.discoveredGlobalBase && pass1.notFound.length > 0) {
+      rememberVertexGlobalBase(cleanBase, apiKey, pass1.discoveredGlobalBase);
+      ranPass2 = true;
+      const pass2 = await runProbeBatch(pass1.discoveredGlobalBase, pass1.notFound);
+      verifiedIds.push(...pass2.verified);
+      pass2NotFound = pass2.notFound.length;
+      if (!authErrorMsg && pass2.authErrorMsg) authErrorMsg = pass2.authErrorMsg;
+      if (pass2.lastErrMsg) lastErrMsg = pass2.lastErrMsg;
+    } else if (initialBase !== cleanBase && pass1.notFound.length > 0) {
+      ranPass2 = true;
+      const pass2 = await runProbeBatch(cleanBase, pass1.notFound);
+      verifiedIds.push(...pass2.verified);
+      pass2NotFound = pass2.notFound.length;
+      if (!authErrorMsg && pass2.authErrorMsg) authErrorMsg = pass2.authErrorMsg;
+      if (pass2.lastErrMsg) lastErrMsg = pass2.lastErrMsg;
+    }
+
+    if (verifiedIds.length > 0) {
+      const sorted = prioritizeModelIds(verifiedIds);
+      sorted.isVertexProbed = true;
+      return sorted;
+    }
+    if (authErrorMsg) {
+      throw new Error(`Vertex AI: ${authErrorMsg}`);
+    }
+    const allStillNotFound =
+      pass1.notFound.length === candidates.length &&
+      (!ranPass2 || pass2NotFound === pass1.notFound.length);
+    if (allStillNotFound) {
+      const fallback = prioritizeModelIds(VERTEX_AI_CURATED_MODELS);
+      fallback.isFallbackCatalog = true;
+      return fallback;
+    }
+    throw new Error(`Vertex AI: ${lastErrMsg || "Model availability probe failed"}`);
+  }
+
+  /**
    * 从目标接口动态拉取可用的对话生成模型列表（自动过滤嵌入、语音、生图等非对话模型）。
    */
-  async function fetchAvailableModels({ provider, baseUrl, apiKey }) {
+  async function fetchAvailableModels({
+    provider,
+    baseUrl,
+    apiKey,
+    currentModel = "",
+    extraModels = []
+  }) {
     const protocol = detectProtocol(provider, baseUrl);
 
     if (protocol === "anthropic") {
@@ -244,7 +645,7 @@
         const msg =
           (errJson && errJson.error && errJson.error.message) ||
           `HTTP ${res.status}: ${res.statusText}`;
-        throw new Error(msg);
+        throw createApiError(msg, res.status);
       }
       const data = await res.json();
       const ids = (Array.isArray(data.data) ? data.data : [])
@@ -255,6 +656,25 @@
 
     if (protocol === "vertex") {
       const cleanBase = resolveGeminiEndpointBase(baseUrl);
+      const rawKey = (apiKey || "").trim();
+      const isOAuth = /^Bearer\s+/i.test(rawKey) || /^ya29\./i.test(rawKey);
+      const isOfficialVertex = /aiplatform\.googleapis\.com/i.test(cleanBase);
+      const mergedExtra = [
+        ...(Array.isArray(extraModels) ? extraModels : []),
+        ...(currentModel ? [currentModel] : [])
+      ];
+
+      // 官方 Vertex AI Express API Key 禁止访问 GET /models：
+      // 合并一方在线清单 + 历史自定义探测记录 + 内置 Gemini 4/3/2.5 候选，再并行免费 :countTokens 实测
+      if (isOfficialVertex && !isOAuth) {
+        const discovered = await discoverGoogleFirstPartyModels(apiKey);
+        return probeVertexAvailableModels({
+          cleanBase,
+          apiKey,
+          extraModels: [...mergedExtra, ...discovered]
+        });
+      }
+
       const defaultHeaders = buildGeminiAuthHeaders(apiKey, false);
       const probes = [{ url: `${cleanBase}/models?pageSize=200`, headers: defaultHeaders }];
 
@@ -279,7 +699,7 @@
       }
 
       let lastErrMsg = "";
-      let onlyNotFoundOrForbidden = true;
+      let onlyUnsupportedOrMissing = true;
 
       for (const probe of probes) {
         try {
@@ -292,24 +712,22 @@
             }
             continue;
           }
-          if (res.status !== 403 && res.status !== 404) {
-            onlyNotFoundOrForbidden = false;
+          if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
+            onlyUnsupportedOrMissing = false;
           }
           const errJson = await res.json().catch(() => null);
           lastErrMsg =
             (errJson && errJson.error && errJson.error.message) ||
             `HTTP ${res.status}: ${res.statusText}`;
         } catch (netErr) {
-          onlyNotFoundOrForbidden = false;
+          onlyUnsupportedOrMissing = false;
           lastErrMsg = netErr && netErr.message ? netErr.message : String(netErr);
         }
       }
 
-      // Google Vertex AI Express API Key 等凭证不支持远端枚举 Model Garden 列表，自动降级为内置官方目录
-      if (onlyNotFoundOrForbidden) {
-        const fallback = prioritizeModelIds(VERTEX_AI_CURATED_MODELS);
-        fallback.isFallbackCatalog = true;
-        return fallback;
+      // 若 GET /models 返回 401/403/404，自动通过免费 :countTokens 探测或反代降级目录解析
+      if (onlyUnsupportedOrMissing) {
+        return probeVertexAvailableModels({ cleanBase, apiKey, extraModels: mergedExtra });
       }
       throw new Error(lastErrMsg || "Vertex AI /models request failed");
     }
@@ -325,7 +743,7 @@
         const msg =
           (errJson && errJson.error && errJson.error.message) ||
           `HTTP ${res.status}: ${res.statusText}`;
-        throw new Error(msg);
+        throw createApiError(msg, res.status);
       }
       const data = await res.json();
       return prioritizeModelIds(extractGeminiStyleModelIds(data));
@@ -344,7 +762,7 @@
       const msg =
         (errJson && errJson.error && errJson.error.message) ||
         `HTTP ${res.status}: ${res.statusText}`;
-      throw new Error(msg);
+      throw createApiError(msg, res.status);
     }
 
     const data = await res.json();
@@ -407,7 +825,7 @@
       .replace(/^(?:publishers\/google\/)?models\//i, "")
       .replace(/:generateContent$/i, "");
 
-    const endpoint = `${cleanBase}/models/${encodeURIComponent(cleanModel)}:generateContent`;
+    const encodedModel = encodeURIComponent(cleanModel);
     const isFlash25 = /^gemini-2\.5-flash/i.test(cleanModel);
 
     const generationConfig = {
@@ -429,14 +847,19 @@
 
     const headers = buildGeminiAuthHeaders(apiKey, true);
 
-    let res = await fetch(endpoint, {
-      method: "POST",
+    let { res, endpoint, cachedErrJson } = await postGeminiWithVertexRouting({
+      cleanBase,
+      apiKey,
+      encodedModel,
+      action: "generateContent",
+      isVertex,
       headers,
       body: JSON.stringify(primaryPayload)
     });
 
     // 若特定模型或反代不支持 responseSchema / systemInstruction，则逐级降级重试（保留 role 以兼容 Vertex AI）
     if (res.status === 400) {
+      cachedErrJson = null;
       const combinedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
       res = await fetch(endpoint, {
         method: "POST",
@@ -462,11 +885,12 @@
     }
 
     if (!res.ok) {
-      const errJson = await res.json().catch(() => null);
-      const msg =
+      const errJson = cachedErrJson || (await res.json().catch(() => null));
+      const detail =
         (errJson && errJson.error && errJson.error.message) ||
-        `${res.status} ${res.statusText}`;
-      throw new Error(`${isVertex ? "Vertex AI" : "Gemini API"}: ${msg}`);
+        res.statusText ||
+        "Request failed";
+      throw createApiError(`${isVertex ? "Vertex AI" : "Gemini API"} (${res.status}): ${detail}`, res.status);
     }
 
     const data = await res.json();
@@ -535,7 +959,7 @@
       const msg =
         (errJson && errJson.error && errJson.error.message) ||
         `${res.status} ${res.statusText}`;
-      throw new Error(`AI API (${res.status}): ${msg}`);
+      throw createApiError(`AI API (${res.status}): ${msg}`, res.status);
     }
 
     const data = await res.json();
@@ -549,7 +973,7 @@
     const cleanBase = normalizeAnthropicBaseUrl(baseUrl);
     const endpoint = `${cleanBase}/messages`;
     const body = {
-      model: model || "claude-sonnet-4-5",
+      model: model || "claude-haiku-5-5",
       max_tokens: 4096,
       temperature: 0,
       ...(systemPrompt ? { system: systemPrompt } : {}),
@@ -567,7 +991,7 @@
       const msg =
         (errJson && errJson.error && errJson.error.message) ||
         `${res.status} ${res.statusText}`;
-      throw new Error(`Claude API (${res.status}): ${msg}`);
+      throw createApiError(`Claude API (${res.status}): ${msg}`, res.status);
     }
 
     const data = await res.json();
@@ -601,7 +1025,7 @@
         method: "POST",
         headers: buildAnthropicHeaders(apiKey, true),
         body: JSON.stringify({
-          model: model || "claude-sonnet-4-5",
+          model: model || "claude-haiku-5-5",
           max_tokens: 16,
           messages: [{ role: "user", content: "Reply with OK" }]
         })
@@ -612,7 +1036,7 @@
         const msg =
           (errJson && errJson.error && errJson.error.message) ||
           `HTTP ${res.status}: ${res.statusText}`;
-        throw new Error(msg);
+        throw createApiError(msg, res.status);
       }
 
       const data = await res.json();
@@ -626,11 +1050,12 @@
 
     if (protocol === "gemini" || protocol === "vertex") {
       const cleanBase = resolveGeminiEndpointBase(baseUrl);
+      const isVertex = protocol === "vertex" || isVertexAiUrl(cleanBase);
       const cleanModel = (model || "gemini-3.8-flash")
         .trim()
         .replace(/^(?:publishers\/google\/)?models\//i, "")
         .replace(/:generateContent$/i, "");
-      const endpoint = `${cleanBase}/models/${encodeURIComponent(cleanModel)}:generateContent`;
+      const encodedModel = encodeURIComponent(cleanModel);
 
       const payload = { contents: [{ role: "user", parts: [{ text: "Reply with OK" }] }] };
       if (/^gemini-2\.5-flash/i.test(cleanModel)) {
@@ -639,13 +1064,18 @@
 
       const headers = buildGeminiAuthHeaders(apiKey, true);
 
-      let res = await fetch(endpoint, {
-        method: "POST",
+      let { res, endpoint, cachedErrJson } = await postGeminiWithVertexRouting({
+        cleanBase,
+        apiKey,
+        encodedModel,
+        action: "generateContent",
+        isVertex,
         headers,
         body: JSON.stringify(payload)
       });
 
       if (res.status === 400 && payload.generationConfig) {
+        cachedErrJson = null;
         res = await fetch(endpoint, {
           method: "POST",
           headers,
@@ -654,11 +1084,11 @@
       }
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
+        const errJson = cachedErrJson || (await res.json().catch(() => null));
         const msg =
           (errJson && errJson.error && errJson.error.message) ||
           `HTTP ${res.status}: ${res.statusText}`;
-        throw new Error(msg);
+        throw createApiError(msg, res.status);
       }
 
       const data = await res.json();
@@ -697,7 +1127,7 @@
       const msg =
         (errJson && errJson.error && errJson.error.message) ||
         `HTTP ${res.status}: ${res.statusText}`;
-      throw new Error(msg);
+      throw createApiError(msg, res.status);
     }
 
     const data = await res.json();
@@ -718,11 +1148,15 @@
     isVertexAiUrl,
     detectProtocol,
     normalizeGeminiBaseUrl,
+    deriveVertexGlobalBaseFromError,
     buildGeminiAuthHeaders,
     buildAnthropicHeaders,
     fetchAvailableModels,
+    probeSingleVertexModel,
     callLLM,
     testAIConnection,
-    extractJsonFromText
+    extractJsonFromText,
+    sanitizeErrorExcerpt,
+    classifyAiError
   };
 })(typeof window !== "undefined" ? window : globalThis);

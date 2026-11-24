@@ -26,9 +26,12 @@
   --badge-ai-text: #7c3aed;
   --badge-saved-bg: rgba(18, 128, 92, 0.12);
   --badge-saved-text: #12805c;
+  --badge-error-bg: rgba(209, 52, 75, 0.12);
+  --badge-error-text: #c81e3a;
   --success-color: #12805c;
   --danger-color: #d1344b;
   --danger-bg: rgba(209, 52, 75, 0.1);
+  --danger-border: rgba(209, 52, 75, 0.28);
   --mark-bg: rgba(245, 185, 66, 0.34);
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --radius-card: 13px;
@@ -62,9 +65,12 @@
     --badge-ai-text: #e0b3ff;
     --badge-saved-bg: rgba(61, 214, 165, 0.15);
     --badge-saved-text: #3dd6a5;
+    --badge-error-bg: rgba(251, 113, 133, 0.16);
+    --badge-error-text: #fda4af;
     --success-color: #3dd6a5;
     --danger-color: #fb7185;
     --danger-bg: rgba(251, 113, 133, 0.14);
+    --danger-border: rgba(251, 113, 133, 0.34);
     --mark-bg: rgba(250, 204, 21, 0.26);
   }
 }
@@ -192,6 +198,7 @@ body {
 .badge-rule { background: var(--badge-rule-bg); color: var(--badge-rule-text); }
 .badge-ai { background: var(--badge-ai-bg); color: var(--badge-ai-text); }
 .badge-saved { background: var(--badge-saved-bg); color: var(--badge-saved-text); }
+.badge-error { background: var(--badge-error-bg); color: var(--badge-error-text); }
 
 .icon-btn {
   background: transparent;
@@ -227,6 +234,10 @@ body {
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: 84px;
+  overflow-y: auto;
 }
 
 /* ==================== 视图一：智能收藏与编辑 ==================== */
@@ -328,6 +339,130 @@ body {
 
 .onboarding-cta:hover {
   background: var(--accent-hover);
+}
+
+/* AI 调用失败与重试提示条 */
+.ai-error-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius-card);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  font-size: 11.5px;
+}
+
+.ai-error-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ai-error-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--danger-color);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ai-error-toggle:hover {
+  text-decoration: underline;
+}
+
+.ai-error-icon {
+  flex-shrink: 0;
+}
+
+.ai-error-chevron {
+  flex-shrink: 0;
+  opacity: 0.78;
+  transition: transform 0.16s var(--ease-spring);
+}
+
+.ai-error-toggle[aria-expanded="true"] .ai-error-chevron {
+  transform: rotate(180deg);
+}
+
+.ai-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.ai-err-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3.5px 8.5px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.ai-err-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.ai-err-btn-primary,
+.ai-error-strip.is-config-primary .ai-err-btn-secondary {
+  border: 1px solid var(--danger-color);
+  background: var(--danger-color);
+  color: #ffffff;
+}
+
+.ai-error-strip.is-config-primary .ai-err-btn-secondary {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+.ai-err-btn-primary:hover:not(:disabled),
+.ai-error-strip.is-config-primary .ai-err-btn-secondary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.ai-err-btn-secondary,
+.ai-error-strip.is-config-primary .ai-err-btn-primary {
+  border: 1px solid var(--danger-border);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.ai-err-btn-secondary:hover:not(:disabled),
+.ai-error-strip.is-config-primary .ai-err-btn-primary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.ai-error-detail {
+  padding-top: 6px;
+  border-top: 1px solid var(--danger-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  max-height: 72px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
 }
 
 /* 站点身份预览卡片 */
@@ -441,6 +576,11 @@ label {
   font-weight: 600;
 }
 
+.reason-text.is-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 .inline-ai-btn {
   display: inline-flex;
   align-items: center;
@@ -493,7 +633,8 @@ input[type="text"]:focus {
   box-shadow: var(--focus-ring);
 }
 
-input[type="text"].is-shimmering {
+input[type="text"].is-shimmering,
+.combo-trigger.is-shimmering {
   background: linear-gradient(90deg, var(--bg-input) 25%, var(--accent-soft) 50%, var(--bg-input) 75%);
   background-size: 200% 100%;
   animation: titleShimmer 0.9s infinite linear;

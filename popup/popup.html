@@ -76,6 +76,34 @@
           <button id="btnGoSetupAI" class="onboarding-cta" type="button" data-i18n="pop_onboarding_cta">去配置 →</button>
         </div>
 
+        <!-- AI 调用失败与重试提示条 -->
+        <div id="aiErrorStrip" class="ai-error-strip hidden" role="alert">
+          <div class="ai-error-row">
+            <button id="btnAiErrorToggle" class="ai-error-toggle" type="button" aria-expanded="false">
+              <svg class="ai-error-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span id="aiErrorSummaryText" class="truncate" data-i18n="pop_ai_err_generic">AI 调用失败</span>
+              <svg id="aiErrorChevron" class="ai-error-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="ai-error-actions">
+              <button id="btnAiRetry" class="ai-err-btn ai-err-btn-primary" type="button">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span data-i18n="pop_btn_ai_retry">重试</span>
+              </button>
+              <button id="btnAiConfig" class="ai-err-btn ai-err-btn-secondary" type="button" data-i18n="pop_btn_ai_config">配置</button>
+            </div>
+          </div>
+          <div id="aiErrorDetailBox" class="ai-error-detail hidden"></div>
+        </div>
+
         <!-- 站点身份预览卡片 -->
         <div class="site-identity-card">
           <div class="site-icon-box">

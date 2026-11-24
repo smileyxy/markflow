@@ -14,7 +14,7 @@
       baseUrl: "https://api.deepseek.com/v1",
       apiKey: "",
       model: "deepseek-flash",
-      quickModels: ["deepseek-flash", "deepseek-v4-pro", "deepseek-reasoner"],
+      quickModels: ["deepseek-v4-pro", "deepseek-flash"],
       keyPlaceholder: "sk-...",
       urlHintKey: "ai_base_url_hint"
     },
@@ -24,10 +24,11 @@
       apiKey: "",
       model: "deepseek-ai/DeepSeek-V4.1-Flash",
       quickModels: [
+        "deepseek-ai/DeepSeek-V4-Pro",
         "deepseek-ai/DeepSeek-V4.1-Flash",
-        "Qwen/Qwen3.5-35B-A3B",
         "zai-org/GLM-5.3-Flash",
-        "Qwen/Qwen3-8B"
+        "Qwen/Qwen3.5-35B-A3B",
+        "Qwen/Qwen3.5-9B"
       ],
       keyPlaceholder: "sk-...",
       urlHintKey: "ai_base_url_hint"
@@ -36,12 +37,13 @@
       name: "OpenRouter",
       baseUrl: "https://openrouter.ai/api/v1",
       apiKey: "",
-      model: "google/gemini-2.5-flash",
+      model: "deepseek/deepseek-v4.1-flash",
       quickModels: [
-        "google/gemini-2.5-flash",
-        "deepseek/deepseek-chat-v3-0324",
-        "anthropic/claude-sonnet-4",
-        "openai/gpt-4.1-mini"
+        "google/gemini-4-carbon",
+        "google/gemini-4-hydrogen",
+        "deepseek/deepseek-v4.1-flash",
+        "anthropic/claude-haiku-5.5",
+        "openai/gpt-6-luna"
       ],
       keyPlaceholder: "sk-or-v1-...",
       urlHintKey: "ai_openrouter_url_hint"
@@ -66,10 +68,10 @@
         }
       ],
       quickModels: [
+        "gemini-4-carbon",
+        "gemini-4-hydrogen",
         "gemini-3.8-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.1-pro"
+        "gemini-3.5-flash-lite"
       ],
       keyPlaceholder: "AIzaSy... / AQ.... / ya29....",
       urlHintKey: "ai_gemini_url_hint"
@@ -78,12 +80,12 @@
       name: "Claude (Anthropic)",
       baseUrl: "https://api.anthropic.com/v1",
       apiKey: "",
-      model: "claude-sonnet-4-5",
+      model: "claude-haiku-5-5",
       quickModels: [
-        "claude-haiku-4-5",
-        "claude-sonnet-4-5",
-        "claude-opus-4-1",
-        "claude-3-7-sonnet-latest"
+        "claude-opus-5-5",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-4-5"
       ],
       keyPlaceholder: "sk-ant-...",
       urlHintKey: "ai_claude_url_hint"
@@ -93,7 +95,7 @@
       baseUrl: "https://api.openai.com/v1",
       apiKey: "",
       model: "gpt-6-luna",
-      quickModels: ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-sol"],
+      quickModels: ["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6.1-terra", "gpt-6-luna"],
       keyPlaceholder: "sk-...",
       urlHintKey: "ai_base_url_hint"
     },
@@ -101,8 +103,8 @@
       name: "Grok (xAI)",
       baseUrl: "https://api.x.ai/v1",
       apiKey: "",
-      model: "grok-3-mini",
-      quickModels: ["grok-3-mini", "grok-3", "grok-4-fast"],
+      model: "grok-4.3",
+      quickModels: ["grok-4.7", "grok-4.7-fast", "grok-4.3", "grok-3-mini"],
       keyPlaceholder: "xai-...",
       urlHintKey: "ai_base_url_hint"
     },
@@ -111,7 +113,7 @@
       baseUrl: "http://localhost:11434/v1",
       apiKey: "ollama",
       model: "qwen3.5:9b",
-      quickModels: ["qwen3.5:9b", "qwen3.5:4b", "gemma4:12b"],
+      quickModels: ["qwen3.8:27b", "gemma4:12b", "qwen3.5:9b", "qwen3.5:4b"],
       keyPlaceholder: "ollama",
       urlHintKey: "ai_base_url_hint"
     },
@@ -131,6 +133,10 @@
     "deepseek-ai/DeepSeek-V3",
     "gemini-2.5-flash",
     "deepseek-chat",
+    "deepseek-reasoner",
+    "claude-sonnet-4-5",
+    "grok-3-mini",
+    "google/gemini-2.5-flash",
     "gpt-4o-mini",
     "qwen2.5:7b"
   ]);

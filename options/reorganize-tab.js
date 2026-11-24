@@ -11,11 +11,14 @@
   "use strict";
 
   const ctx = global.MarkFlowOptions;
-  const { appState, t, parseFolderStructures, showToast } = ctx;
+  const { appState, t, parseFolderStructures, showToast, formatFriendlyAiError } = ctx;
   const { escapeHtml } = MarkFlowEngine;
 
   /** 标记顶部启动按钮是否已降级为次级样式（当下方蓝图或预览卡片展开时降级，突出唯一主操作） */
   let isStartButtonDemoted = false;
+  let lastBatchMappingContext = null;
+  let lastBatchErrorSummary = "";
+  let reorgRetryInFlight = false;
 
   /** 导出当前全量书签树为标准 Netscape HTML 备份文件 */
   async function downloadBookmarksBackup() {
@@ -55,6 +58,11 @@
       String(item.targetFolderId) !== String(item.currentFolderId) ||
       Boolean(item.orderChanged)
     );
+  }
+
+  /** 判断条目在“仅展示变动项”模式下是否应保留显示（有实质变动或 AI 调用失败待重试） */
+  function isItemVisibleInPreview(item) {
+    return isItemChanged(item) || Boolean(item && item.aiFailed);
   }
 
   /**
@@ -234,6 +242,8 @@
 
       document.getElementById("reorgBlueprintContainer").classList.add("hidden");
       document.getElementById("reorgPreviewContainer").classList.add("hidden");
+      lastBatchMappingContext = null;
+      lastBatchErrorSummary = "";
 
       if (isRebuild) renderLockedFoldersChecklist();
       setStartButtonDemoted(false);
@@ -283,6 +293,8 @@
     document.getElementById("btnAddBlueprintL1").addEventListener("click", addNewBlueprintCategory);
     document.getElementById("btnConfirmBlueprint").addEventListener("click", runBlueprintMappingStage);
     document.getElementById("btnApplyReorganize").addEventListener("click", applyReorganizerChanges);
+    const btnRetryFailed = document.getElementById("btnRetryFailedReorg");
+    if (btnRetryFailed) btnRetryFailed.addEventListener("click", retryFailedBatchItems);
 
     populateReorgFolderSelect();
     renderLockedFoldersChecklist();
@@ -381,6 +393,8 @@
     appState.activeReorgMode = "sort_only";
     appState.activeTargetFolders = appState.allFoldersTree;
     appState.previewCategoryFilter = "ALL";
+    lastBatchMappingContext = null;
+    lastBatchErrorSummary = "";
     document.getElementById("reorgBlueprintContainer").classList.add("hidden");
 
     const sortRule = getSelectedSortRule();
@@ -466,7 +480,7 @@
     progressText.textContent = t("reorg_prog_prepare", { count: rawBookmarks.length });
     progressPercent.textContent = "0%";
 
-    await executeBatchMapping(rawBookmarks, appState.treeAnalysis, true);
+    const mappingSummary = await executeBatchMapping(rawBookmarks, appState.treeAnalysis, true);
 
     if (document.getElementById("chkSortInFolders").checked) {
       sortPreviewItemsByDestinationFolder();
@@ -480,7 +494,17 @@
     previewBox.classList.remove("hidden");
     setStartButtonDemoted(true);
     previewBox.scrollIntoView({ behavior: "smooth", block: "start" });
-    showToast(t("reorg_toast_existing_ready", { count: appState.reorgItems.length }));
+    if (mappingSummary.failedCount > 0) {
+      showToast(
+        t("reorg_toast_partial_err", {
+          failed: mappingSummary.failedCount,
+          msg: mappingSummary.errorSummary
+        }),
+        true
+      );
+    } else {
+      showToast(t("reorg_toast_existing_ready", { count: appState.reorgItems.length }));
+    }
   }
 
   // ---------------- 模式二（阶段一）：生成与编辑两级目录蓝图 ---------------- //
@@ -541,7 +565,7 @@
       bpBox.scrollIntoView({ behavior: "smooth", block: "start" });
       showToast(t("reorg_toast_bp_ready", { count: blueprint.length }));
     } catch (err) {
-      showToast(t("reorg_toast_bp_err", { msg: err.message }), true);
+      showToast(t("reorg_toast_bp_err", { msg: formatFriendlyAiError(err) }), true);
     } finally {
       btnStart.disabled = false;
       btnRegen.disabled = false;
@@ -745,7 +769,7 @@
     previewBox.classList.add("hidden");
 
     try {
-      await executeBatchMapping(
+      const mappingSummary = await executeBatchMapping(
         appState.rebuildRawBookmarks,
         blueprintTree,
         true,
@@ -759,6 +783,9 @@
       appState.blueprintCategories = consolidatedCategories;
       blueprintTree = MarkFlowEngine.buildBlueprintTreeAnalysis(consolidatedCategories, iconStyle);
       appState.activeTargetFolders = blueprintTree.folders.filter(f => f.depth >= 2);
+      if (lastBatchMappingContext) {
+        lastBatchMappingContext.targetTreeAnalysis = blueprintTree;
+      }
       renderBlueprintEditor();
 
       sortPreviewItemsByDestinationFolder();
@@ -766,13 +793,23 @@
       previewBox.classList.remove("hidden");
       previewBox.scrollIntoView({ behavior: "smooth", block: "start" });
 
-      showToast(
-        rolledUpCount > 0
-          ? t("reorg_toast_mapped_orphan", { count: appState.reorgItems.length, orphan: rolledUpCount })
-          : t("reorg_toast_mapped", { count: appState.reorgItems.length })
-      );
+      if (mappingSummary.failedCount > 0) {
+        showToast(
+          t("reorg_toast_partial_err", {
+            failed: mappingSummary.failedCount,
+            msg: mappingSummary.errorSummary
+          }),
+          true
+        );
+      } else {
+        showToast(
+          rolledUpCount > 0
+            ? t("reorg_toast_mapped_orphan", { count: appState.reorgItems.length, orphan: rolledUpCount })
+            : t("reorg_toast_mapped", { count: appState.reorgItems.length })
+        );
+      }
     } catch (err) {
-      showToast(t("reorg_toast_map_err", { msg: err.message }), true);
+      showToast(t("reorg_toast_map_err", { msg: formatFriendlyAiError(err) }), true);
     } finally {
       btnConfirm.disabled = false;
       progressBox.classList.add("hidden");
@@ -811,6 +848,14 @@
     const effectiveMemory = domainMemoryOverride || appState.domainMemory || {};
     const orderedBookmarks = MarkFlowEngine.clusterBookmarksForBatching(rawBookmarks);
     const collectedItems = [];
+
+    lastBatchMappingContext = {
+      targetTreeAnalysis,
+      useDomainAffinity,
+      domainMemoryOverride
+    };
+    lastBatchErrorSummary = "";
+    let failedCount = 0;
 
     const total = orderedBookmarks.length;
     const activeCfg = MarkFlowEngine.resolveActiveProviderConfig(appState.aiConfig);
@@ -867,7 +912,9 @@
             targetFolderName: destName,
             funcGroup: MarkFlowEngine.inferLocalFuncGroup(bm.url, cleanTitle),
             reason: t("reorg_reason_rule", { name: matchedRule.name }),
-            ignored: false
+            ignored: false,
+            aiFailed: false,
+            aiErrorDetail: ""
           });
           MarkFlowEngine.recordRollingMappingAnchor(targetTreeAnalysis, bm.url, cleanTitle, destId);
         } else {
@@ -908,7 +955,9 @@
                 funcGroup:
                   res.funcGroup || MarkFlowEngine.inferLocalFuncGroup(item.bm.url, finalTitle),
                 reason: res.reason || t("reorg_reason_ai"),
-                ignored: false
+                ignored: false,
+                aiFailed: false,
+                aiErrorDetail: ""
               });
               MarkFlowEngine.recordRollingMappingAnchor(
                 targetTreeAnalysis,
@@ -919,6 +968,10 @@
             });
           } catch (err) {
             console.warn("Batch AI error, falling back:", err);
+            const friendlyErr = formatFriendlyAiError(err);
+            if (!lastBatchErrorSummary) lastBatchErrorSummary = friendlyErr;
+            failedCount += unhandledByRule.length;
+
             const fallbackFolder =
               targetTreeAnalysis.folders.find(f => f.depth === 3) ||
               targetTreeAnalysis.folders.find(f => f.depth === 2) ||
@@ -949,8 +1002,13 @@
                 targetFolderId: fbId,
                 targetFolderName: fbName,
                 funcGroup: MarkFlowEngine.inferLocalFuncGroup(item.bm.url, item.cleanTitle),
-                reason: item.domainAffinity ? item.domainAffinity.reason : t("reorg_reason_fallback"),
-                ignored: false
+                reason: item.domainAffinity
+                  ? t("reorg_reason_ai_failed_domain", { domain: item.domainAffinity.reason })
+                  : t("reorg_reason_fallback"),
+                ignored: false,
+                aiFailed: true,
+                aiErrorDetail: friendlyErr,
+                _retryInput: item
               });
             });
           }
@@ -976,7 +1034,9 @@
               targetFolderName: fallbackName,
               funcGroup: MarkFlowEngine.inferLocalFuncGroup(item.bm.url, item.cleanTitle),
               reason: item.domainAffinity ? item.domainAffinity.reason : t("reorg_reason_local"),
-              ignored: false
+              ignored: false,
+              aiFailed: false,
+              aiErrorDetail: ""
             });
           });
         }
@@ -991,6 +1051,127 @@
 
     collectedItems.sort((a, b) => a._origOrderIdx - b._origOrderIdx);
     appState.reorgItems = collectedItems;
+    return { total, failedCount, errorSummary: lastBatchErrorSummary };
+  }
+
+  /** 仅针对先前调用 AI 失败且未被跳过的书签发起局部重试，避免重复消耗已成功批次的 Token */
+  async function retryFailedBatchItems() {
+    if (reorgRetryInFlight || !lastBatchMappingContext) return;
+    const failedItems = appState.reorgItems.filter(i => !i.ignored && i.aiFailed && i._retryInput);
+    if (failedItems.length === 0) return;
+
+    const activeCfg = MarkFlowEngine.resolveActiveProviderConfig(appState.aiConfig);
+    const canUseAI =
+      activeCfg.enabled &&
+      activeCfg.baseUrl &&
+      (activeCfg.apiKey || activeCfg.provider === "ollama");
+    if (!canUseAI) {
+      showToast(t("reorg_toast_need_ai"), true);
+      return;
+    }
+
+    const targetTreeAnalysis = lastBatchMappingContext.targetTreeAnalysis;
+    const usePangu = appState.preferences.panguSpacing !== false;
+
+    const progressBox = document.getElementById("reorgProgressContainer");
+    const progressBar = document.getElementById("reorgProgressBar");
+    const progressText = document.getElementById("reorgProgressText");
+    const progressPercent = document.getElementById("reorgProgressPercent");
+    const btnRetry = document.getElementById("btnRetryFailedReorg");
+    const btnStart = document.getElementById("btnStartReorganize");
+    const btnApply = document.getElementById("btnApplyReorganize");
+
+    reorgRetryInFlight = true;
+    if (btnRetry) btnRetry.disabled = true;
+    if (btnStart) btnStart.disabled = true;
+    if (btnApply) btnApply.disabled = true;
+    progressBox.classList.remove("hidden");
+    progressBar.style.width = "0%";
+    progressText.textContent = t("reorg_prog_prepare", { count: failedItems.length });
+    progressPercent.textContent = "0%";
+
+    let succeededCount = 0;
+    let stillFailedCount = 0;
+    let latestError = "";
+
+    try {
+      const BATCH_SIZE = 12;
+      for (let i = 0; i < failedItems.length; i += BATCH_SIZE) {
+        const chunkEntries = failedItems.slice(i, i + BATCH_SIZE);
+        const retryInputs = chunkEntries.map(entry => entry._retryInput);
+
+        try {
+          const aiResults = await MarkFlowEngine.classifyBatchBookmarks({
+            items: retryInputs,
+            treeAnalysis: targetTreeAnalysis,
+            aiConfig: appState.aiConfig,
+            preferences: appState.preferences,
+            usePangu
+          });
+
+          chunkEntries.forEach((entry, idx) => {
+            const res = aiResults[idx] || {};
+            if (res.cleanTitle && !entry.userEditedTitle) {
+              entry.cleanTitle = res.cleanTitle;
+            }
+            if (res.targetFolderId && !entry.userChangedFolder) {
+              entry.targetFolderId = res.targetFolderId;
+              entry.targetFolderName = res.targetFolderName || entry.targetFolderName;
+            }
+            entry.funcGroup =
+              res.funcGroup || MarkFlowEngine.inferLocalFuncGroup(entry.url, entry.cleanTitle);
+            entry.reason = res.reason || t("reorg_reason_ai");
+            entry.aiFailed = false;
+            entry.aiErrorDetail = "";
+            delete entry._retryInput;
+
+            MarkFlowEngine.recordRollingMappingAnchor(
+              targetTreeAnalysis,
+              entry.url,
+              entry.cleanTitle,
+              entry.targetFolderId
+            );
+            succeededCount++;
+          });
+        } catch (err) {
+          const friendlyErr = formatFriendlyAiError(err);
+          if (!latestError) latestError = friendlyErr;
+          chunkEntries.forEach(entry => {
+            entry.aiFailed = true;
+            entry.aiErrorDetail = friendlyErr;
+            stillFailedCount++;
+          });
+        }
+
+        const done = Math.min(i + BATCH_SIZE, failedItems.length);
+        const pct = Math.round((done / failedItems.length) * 100);
+        progressBar.style.width = `${pct}%`;
+        progressText.textContent = t("reorg_prog_mapping", { done, total: failedItems.length });
+        progressPercent.textContent = `${pct}%`;
+      }
+
+      lastBatchErrorSummary = latestError;
+
+      const sortChk = document.getElementById("chkSortInFolders");
+      if (appState.activeReorgMode === "rebuild" || (sortChk && sortChk.checked)) {
+        sortPreviewItemsByDestinationFolder();
+      } else {
+        markOrderChangedFlags(appState.reorgItems);
+      }
+
+      if (stillFailedCount === 0) {
+        showToast(t("reorg_toast_retry_ok", { count: succeededCount }));
+      } else {
+        showToast(t("reorg_toast_partial_err", { failed: stillFailedCount, msg: latestError }), true);
+      }
+    } finally {
+      reorgRetryInFlight = false;
+      progressBox.classList.add("hidden");
+      if (btnRetry) btnRetry.disabled = false;
+      if (btnStart) btnStart.disabled = false;
+      if (btnApply) btnApply.disabled = false;
+      renderReorgPreviewTable({ preserveFilterScroll: true });
+    }
   }
 
   // ---------------- 预览表格、KPI 统计与分类筛选 ---------------- //
@@ -1033,7 +1214,7 @@
 
     for (const item of appState.reorgItems) {
       if (item.ignored) continue;
-      if (appState.previewChangedOnly && !isItemChanged(item)) continue;
+      if (appState.previewChangedOnly && !isItemVisibleInPreview(item)) continue;
       activeTotal++;
       const top = resolveItemTopCategory(item, folderMapById);
       if (!countsByL1.has(top.id)) {
@@ -1065,6 +1246,28 @@
     bar.replaceChildren(frag);
   }
 
+  function renderBatchErrorBanner() {
+    const banner = document.getElementById("reorgBatchErrorBanner");
+    const textEl = document.getElementById("reorgBatchErrorText");
+    const btnRetry = document.getElementById("btnRetryFailedReorg");
+    if (!banner || !textEl || !btnRetry) return;
+
+    const failedActive = appState.reorgItems.filter(i => !i.ignored && i.aiFailed);
+    if (failedActive.length === 0) {
+      banner.classList.add("hidden");
+      return;
+    }
+
+    const sampleMsg = failedActive[0].aiErrorDetail || lastBatchErrorSummary || t("pop_ai_err_generic");
+    textEl.textContent = t("reorg_batch_err_banner", {
+      count: failedActive.length,
+      msg: sampleMsg
+    });
+    btnRetry.textContent = t("reorg_btn_retry_failed", { count: failedActive.length });
+    btnRetry.disabled = reorgRetryInFlight;
+    banner.classList.remove("hidden");
+  }
+
   function renderReorgPreviewTable(opts = {}) {
     const tbody = document.getElementById("reorgPreviewTableBody");
     const statsBar = document.getElementById("reorgCategoryStatsBar");
@@ -1081,14 +1284,17 @@
 
     const folderMapById = new Map(folderChoices.map(f => [String(f.id), f]));
     updateReorgKpiSummary();
+    renderBatchErrorBanner();
     renderPreviewCategoryStatsBar(folderChoices);
 
     const activeItems = appState.reorgItems.filter(i => !i.ignored);
     const changedActiveCount = activeItems.filter(isItemChanged).length;
-    const unchangedCount = Math.max(0, activeItems.length - changedActiveCount);
+    const failedActiveCount = activeItems.filter(i => i.aiFailed).length;
+    const visibleChangedOnlyCount = activeItems.filter(isItemVisibleInPreview).length;
+    const unchangedCount = Math.max(0, activeItems.length - visibleChangedOnlyCount);
     const hintEl = document.getElementById("reorgUnchangedHint");
     if (hintEl) {
-      if (activeItems.length > 0 && changedActiveCount === 0) {
+      if (activeItems.length > 0 && changedActiveCount === 0 && failedActiveCount === 0) {
         hintEl.textContent = t("reorg_all_clean_hint");
         hintEl.classList.remove("hidden");
       } else if (appState.previewChangedOnly && unchangedCount > 0) {
@@ -1107,7 +1313,7 @@
     let renderedCount = 0;
 
     appState.reorgItems.forEach((item, idx) => {
-      if (appState.previewChangedOnly && !isItemChanged(item)) return;
+      if (appState.previewChangedOnly && !isItemVisibleInPreview(item)) return;
       if (appState.previewCategoryFilter !== "ALL") {
         const top = resolveItemTopCategory(item, folderMapById);
         if (top.id !== appState.previewCategoryFilter) return;
@@ -1127,23 +1333,24 @@
         !titleChanged && !folderChanged && item.orderChanged
           ? `<span class="order-only-badge">${escapeHtml(t("reorg_badge_order_only"))}</span>`
           : "";
+      const reasonTooltip = item.aiErrorDetail ? `${item.reason}: ${item.aiErrorDetail}` : item.reason;
 
       tr.innerHTML = `
         <td>
-          <div style="font-weight: 600; font-size: 13px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.originalTitle)}">${escapeHtml(item.originalTitle)}</div>
-          <div style="font-size: 11px; color: var(--text-muted); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" class="font-mono">${escapeHtml(item.url)}</div>
+          <div class="reorg-cell-ellipsis" style="font-weight: 600; font-size: 13px;" title="${escapeHtml(item.originalTitle)}">${escapeHtml(item.originalTitle)}</div>
+          <div class="reorg-cell-ellipsis font-mono" style="font-size: 11px; color: var(--text-muted);" title="${escapeHtml(item.url)}">${escapeHtml(item.url)}</div>
         </td>
         <td>
-          <input type="text" class="form-input reorg-title-input" data-idx="${idx}" value="${escapeHtml(item.cleanTitle)}" style="font-size: 12px; padding: 6px 8px;">
-          <div style="font-size: 11px; color: var(--accent); margin-top: 3px; display: flex; align-items: center; flex-wrap: wrap;">
-            <span>${escapeHtml(item.reason)}</span>${groupBadge}${orderBadge}
+          <input type="text" class="form-input reorg-title-input" data-idx="${idx}" value="${escapeHtml(item.cleanTitle)}">
+          <div class="reorg-preview-meta">
+            <span class="reorg-preview-reason${item.aiFailed ? " is-error" : ""}" title="${escapeHtml(reasonTooltip)}">${escapeHtml(item.reason)}</span>${groupBadge}${orderBadge}
           </div>
         </td>
         <td>
-          <span class="text-muted" style="font-size: 12px;" title="${escapeHtml(item.currentFolderName)}">${escapeHtml(item.currentFolderName)}</span>
+          <div class="text-muted reorg-cell-ellipsis" style="font-size: 12px;" title="${escapeHtml(item.currentFolderName)}">${escapeHtml(item.currentFolderName)}</div>
         </td>
         <td>
-          <select class="form-select font-mono reorg-folder-select" data-idx="${idx}" style="font-size: 11px; padding: 4px 6px;"></select>
+          <select class="form-select font-mono reorg-folder-select" data-idx="${idx}" style="width: 100%; font-size: 11px; padding: 4px 6px;"></select>
         </td>
         <td style="text-align: right;">
           <button class="icon-action-btn reorg-toggle-btn" data-idx="${idx}" type="button" title="${escapeHtml(item.ignored ? t("reorg_action_restore") : t("reorg_action_skip"))}">
@@ -1167,7 +1374,7 @@
     if (renderedCount === 0) {
       const emptyTr = document.createElement("tr");
       const emptyMsg =
-        appState.previewChangedOnly && activeItems.length > 0 && changedActiveCount === 0
+        appState.previewChangedOnly && activeItems.length > 0 && visibleChangedOnlyCount === 0
           ? t("reorg_all_clean_hint")
           : t("reorg_filter_empty");
       emptyTr.innerHTML = `<td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">${escapeHtml(
@@ -1195,6 +1402,7 @@
       inp.addEventListener("input", e => {
         const idx = Number(e.target.getAttribute("data-idx"));
         appState.reorgItems[idx].cleanTitle = e.target.value.trim();
+        appState.reorgItems[idx].userEditedTitle = true;
         updateReorgKpiSummary();
       });
     });
@@ -1203,6 +1411,7 @@
       sel.addEventListener("change", e => {
         const idx = Number(e.target.getAttribute("data-idx"));
         appState.reorgItems[idx].targetFolderId = e.target.value;
+        appState.reorgItems[idx].userChangedFolder = true;
         const f = folderChoices.find(item => String(item.id) === String(e.target.value));
         if (f) appState.reorgItems[idx].targetFolderName = f.breadcrumb;
         markOrderChangedFlags(appState.reorgItems);

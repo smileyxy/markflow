@@ -58,13 +58,19 @@ Browser bookmark bars quickly turn into unsearchable clutter: bloated SEO page t
   </tr>
 </table>
 
+### Master-Detail Model Picker (Vendor &amp; Family Normalization)
+<p align="center">
+  <img src="docs/screenshots/en/05-model-picker.png" alt="MarkFlow AI Master-Detail Model Picker" width="100%" />
+</p>
+
 ---
 
 ## 🚀 Core Features
 
 ### 1. Smart Reorganizer & Taxonomy Architect
-- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and sorting inside each folder with **5 sort rules** (*Smart Priority Tiered*, *Site Domain & Port*, *Title A → Z*, *Newest First*, *Oldest First*) plus a **Changed-Only Preview & Apply** toggle so untouched bookmarks stay intact.
+- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and sorting inside each folder with **5 sort rules** (*Smart Priority Tiered*, *Site Domain & Port*, *Title A → Z*, *Newest First*, *Oldest First*), a **Changed-Only Preview & Apply** toggle, and a **compact single-row preview table** with domain ellipsis.
 - **0-Token Quick Sort**: Reorder bookmarks inside existing folders purely locally using your chosen sort rule without any AI calls.
+- **Resilient Partial Retry**: If any batch encounters upstream quota/network errors during reorganization, failed bookmarks stay highlighted (`AI failed`) with a one-click **`Retry Failed (N)`** action so already-succeeded batches never re-spend tokens.
 - **Two-Stage Full Rebuild**:
   1. **Blueprint Review**: AI proposes a two-level folder hierarchy with **5 visual folder styles** (Semantic Icons, Dual Icons, Plain Text, Numbered `01`, Minimal Symbol `◆`) where you can lock existing folders, rename nodes, or add/remove subfolders;
   2. **Atomic Migration**: Bulk-maps bookmarks (with a real-time **local Token Estimator** before running), folds single-item orphan subfolders, sorts every destination folder, and safely removes empty legacy folders.
@@ -75,8 +81,9 @@ Browser bookmark bars quickly turn into unsearchable clutter: bloated SEO page t
 - Includes a built-in **Live URL Match Tester** inside the rule modal to verify exact rule hits in real time.
 - Optional toggle to pair 0ms rule folder routing with lightweight AI title cleanup.
 
-### 3. Flow-State Capture & Quick Bookmark Launcher
+### 3. Flow-State Capture, Resilient Retry & Quick Launcher
 - Press `Alt + B` on any page to inspect/edit the cleaned title and suggested subfolder, or hit `Enter` to save immediately.
+- If an AI call fails (quota, auth, rate limit, or timeout), the popup automatically pauses the auto-save countdown and surfaces a **compact failure strip** with a one-click **Retry**, expandable error excerpt, and **AI Settings** shortcut — backed by friendly sanitized notifications across the entire UI.
 - Triggering the popup on a New Tab opens directly in **Search Mode**; press `Tab` anytime to toggle between Save and Search with multi-keyword fuzzy matching and keyboard navigation.
 - Configurable **Auto-Save Countdown**, **CJK-Latin spacing (Pangu)**, **3 Title Styles**, **Custom AI Instructions**, and full JSON settings export/import.
 
@@ -89,18 +96,18 @@ Full localized UI & extension metadata across **7 languages**:
 
 ## 🤖 Supported AI Providers
 
-Each provider stores its Base URL, credential, and model ID independently, with one-click live `/models` fetching and collapsible vendor/family model grouping:
+Each provider stores its Base URL, credential, and model ID independently, with one-click live `/models` fetching inside a centered **Master-Detail Model Picker** featuring normalized vendor badges (`Pro` / `Free` / `LoRA` / `Preview` / `Reasoning`), dynamic generation grouping, live search, and Vertex AI custom `:countTokens` verification:
 
 | Provider | Protocol | Recommended Models | Notes |
 | :--- | :--- | :--- | :--- |
-| **DeepSeek** | OpenAI Compatible | `deepseek-flash` / `deepseek-v4-pro` | Default preset; fast technical & multilingual classification |
-| **SiliconFlow** | OpenAI Compatible | `DeepSeek-V4.1-Flash` / `Qwen3.5-35B-A3B` | Fast, cost-effective OpenAI-compatible hosting |
-| **OpenRouter** | OpenAI Compatible | `google/gemini-2.5-flash` / `anthropic/claude-sonnet-4` | Unified gateway across 100+ models grouped by vendor prefix |
-| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-3.8-flash` / `gemini-3.5-flash` | Built-in presets for **Gemini API**, **Vertex AI Express**, and **Vertex AI Project** endpoints (auto API Key / `Bearer` / `ya29.` OAuth + built-in Vertex catalog fallback) |
-| **Claude (Anthropic)** | Anthropic Messages (`/v1/messages`) | `claude-sonnet-4-5` / `claude-haiku-4-5` | Native browser-direct CORS Messages API support |
-| **OpenAI** | OpenAI Compatible | `gpt-6-luna` / `gpt-6.1-terra` | Standard global OpenAI endpoint |
-| **Grok (xAI)** | OpenAI Compatible | `grok-3-mini` / `grok-4-fast` | Official xAI API endpoint |
-| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.5:9b` / `gemma4:12b` | 100% offline local inference, no API Key & zero token cost |
+| **DeepSeek** | OpenAI Compatible | `deepseek-v4-pro` / `deepseek-flash` | Default preset; fast technical & multilingual classification |
+| **SiliconFlow** | OpenAI Compatible | `DeepSeek-V4.1-Flash` / `GLM-5.3-Flash` / `Qwen3.5-35B-A3B` | Fast OpenAI-compatible hosting across DeepSeek V4, GLM-5.3 & Qwen3.5 |
+| **OpenRouter** | OpenAI Compatible | `google/gemini-4-hydrogen` / `deepseek/deepseek-v4.1-flash` / `anthropic/claude-haiku-5.5` | Unified gateway across 100+ models grouped by normalized vendor |
+| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-3.8-flash` | Presets for Gemini API & Vertex AI with automatic Gemini 4 `locations/global` routing, free `:countTokens` probing & custom model verification |
+| **Claude (Anthropic)** | Anthropic Messages (`/v1/messages`) | `claude-opus-5-5` / `claude-haiku-5-5` / `claude-sonnet-5-5` | Native browser-direct CORS Messages API support |
+| **OpenAI** | OpenAI Compatible | `gpt-6.2-astra` / `gpt-6.2-sol` / `gpt-6-luna` | Standard global OpenAI endpoint |
+| **Grok (xAI)** | OpenAI Compatible | `grok-4.7` / `grok-4.7-fast` / `grok-4.3` | Official xAI API endpoint |
+| **Ollama (Local)** | Local OpenAI Compatible | `qwen3.8:27b` / `gemma4:12b` / `qwen3.5:9b` | 100% offline local inference, no API Key & zero token cost |
 | **Custom Endpoint** | OpenAI / Anthropic / Gemini / Vertex | Any Model ID | Supports self-hosted gateways, enterprise proxies, or custom relays |
 
 ---
