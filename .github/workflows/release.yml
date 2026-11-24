@@ -120,13 +120,19 @@ jobs:
           }
 
           // 1. 提取 CHANGELOG.md 中对应版本的主要更新内容（含高亮与分类条目）
-          const md = fs.existsSync("CHANGELOG.md") ? fs.readFileSync("CHANGELOG.md", "utf8") : "";
+          const md = fs.existsSync("CHANGELOG.md")
+            ? fs.readFileSync("CHANGELOG.md", "utf8").replace(/\r\n/g, "\n")
+            : "";
           const escaped = ver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const re = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=^## \\[|$)`, "m");
-          const match = md.match(re);
-          const changelogBody = match
-            ? match[1].trim()
-            : `MarkFlow AI v${ver} 正式发布 / Official release of MarkFlow AI v${ver}.`;
+          const startRe = new RegExp(`^## \\[${escaped}\\][^\\n]*\\n`, "m");
+          const startMatch = startRe.exec(md);
+          let changelogBody = `MarkFlow AI v${ver} 正式发布 / Official release of MarkFlow AI v${ver}.`;
+          if (startMatch) {
+            const rest = md.slice(startMatch.index + startMatch[0].length);
+            const nextIdx = rest.search(/^## \[/m);
+            const sliced = nextIdx === -1 ? rest : rest.slice(0, nextIdx);
+            if (sliced.trim()) changelogBody = sliced.trim();
+          }
 
           // 2. 自动定位上一个版本 tag 并汇总合并提交与变更差异（紧凑版，不附折叠 diff --stat）
           const tags = git('git tag --list "v*" --sort=-v:refname')
