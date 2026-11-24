@@ -157,7 +157,7 @@ MarkFlowI18n.register("en", {
   ai_gemini_url_hint: "Supports Gemini API (v1beta) and Vertex AI (Express / project endpoints) with API Key or Bearer Token; auto-switches for /v1 or /openai relays",
   ai_quick_endpoints_label: "Endpoint Presets:",
   ai_key_label: "API Key",
-  ai_key_hint: "Stored locally in chrome.storage.local and sent directly to your chosen provider.",
+  ai_key_hint: "Stored locally in browser extension storage (storage.local) and sent directly to your chosen provider.",
   ai_model_label: "Model ID",
   ai_quick_models_label: "Recommended:",
   btn_fetch_models: "Fetch Model List",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("en", {
   pref_strip_title: "Strip Trailing SEO Boilerplate",
   pref_strip_desc: "Removes repetitive site suffixes and unread count prefixes automatically.",
   pref_shortcuts_title: "Custom Shortcuts",
-  pref_shortcuts_desc: "Customize your trigger shortcut (default Alt + B) in Chrome's native shortcuts panel.",
+  pref_shortcuts_desc: "Customize your trigger shortcut (default Alt + B) in your browser's native extension shortcuts panel.",
   btn_open_shortcuts: "Customize Shortcuts ↗",
   pref_memory_title: "Domain Affinity Memory",
   pref_memory_desc: "Remembers folders manually chosen for vertical sites to maintain consistency.",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("en", {
   privacy_p1: "Zero-Server Architecture: Everything runs 100% locally in your browser with no central backend server.",
   privacy_p2: "Zero Telemetry or Tracking: We never collect, store, or transmit your browsing history or bookmarks.",
   privacy_p3: "Minimal On-Demand Permissions: Reads active tab metadata only when invoked; deep page reading can be toggled off anytime.",
-  privacy_p4: "Native Browser Sync Compatible: Writes directly to Chrome's native bookmark tree for seamless multi-device sync.",
+  privacy_p4: "Native Browser Sync Compatible: Writes directly to your browser's native bookmark tree for seamless multi-device sync.",
 
   // 指南与扩展动作
   btn_manual_backup: "Backup Bookmarks",

@@ -1627,10 +1627,7 @@
       }
 
       if (
-        idStr === "0" ||
-        idStr === "1" ||
-        idStr === "2" ||
-        idStr === "3" ||
+        MarkFlowEngine.platform.isRootBookmarkNode(node) ||
         isLockedSubtree ||
         protectedNewIds.has(idStr)
       ) {
@@ -1682,19 +1679,18 @@
     return html;
   }
 
-  function formatFolderTrail(parentTrail, folderNode) {
+  function formatFolderTrail(parentTrail, folderNode, parentIsRoot = false) {
     const name = (folderNode.title || "").trim();
-    const idStr = String(folderNode.id || "");
-    if (!name || idStr === "0" || idStr === "1" || idStr === "2" || idStr === "3") {
-      return parentTrail || name || "Bookmarks Bar";
+    if (MarkFlowEngine.platform.isRootBookmarkNode(folderNode)) {
+      return name || parentTrail || "Bookmarks Bar";
     }
-    if (!parentTrail || /^(根目录|书签栏|其他书签|移动设备书签|Bookmarks bar|Other bookmarks)$/i.test(parentTrail)) {
+    if (!parentTrail || parentIsRoot || MarkFlowEngine.platform.isRootFolderName(parentTrail)) {
       return name;
     }
     return `${parentTrail} › ${name}`;
   }
 
-  function collectBookmarks(nodes, parentTrail = "") {
+  function collectBookmarks(nodes, parentTrail = "", parentIsRoot = false) {
     let list = [];
     if (!nodes) return list;
 
@@ -1710,13 +1706,16 @@
           parentTitle: parentTrail || "Bookmarks Bar"
         });
       } else if (node.children) {
-        list = list.concat(collectBookmarks(node.children, formatFolderTrail(parentTrail, node)));
+        const nextIsRoot = MarkFlowEngine.platform.isRootBookmarkNode(node);
+        list = list.concat(
+          collectBookmarks(node.children, formatFolderTrail(parentTrail, node, parentIsRoot), nextIsRoot)
+        );
       }
     }
     return list;
   }
 
-  function collectUnlockedBookmarks(nodes, lockedL1Set, parentTrail = "") {
+  function collectUnlockedBookmarks(nodes, lockedL1Set, parentTrail = "", parentIsRoot = false) {
     let list = [];
     if (!nodes) return list;
 
@@ -1733,8 +1732,14 @@
         });
       } else if (node.children) {
         if (lockedL1Set && lockedL1Set.has(String(node.id))) continue;
+        const nextIsRoot = MarkFlowEngine.platform.isRootBookmarkNode(node);
         list = list.concat(
-          collectUnlockedBookmarks(node.children, lockedL1Set, formatFolderTrail(parentTrail, node))
+          collectUnlockedBookmarks(
+            node.children,
+            lockedL1Set,
+            formatFolderTrail(parentTrail, node, parentIsRoot),
+            nextIsRoot
+          )
         );
       }
     }

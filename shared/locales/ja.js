@@ -324,7 +324,7 @@ MarkFlowI18n.register("ja", {
   pref_strip_title: "不要なSEOタイトルの自動削除",
   pref_strip_desc: "サイト名の接尾辞や未読数プレフィックスを自動的にカットします。",
   pref_shortcuts_title: "ショートカットの変更",
-  pref_shortcuts_desc: "Chromeのショートカット設定画面から変更可能です。",
+  pref_shortcuts_desc: "ブラウザの拡張機能ショートカット設定画面から変更可能です。",
   btn_open_shortcuts: "ショートカット設定 ↗",
   pref_memory_title: "ドメイン分類メモリー",
   pref_memory_desc: "手動で選択したサイトごとの分類先を記憶し、一貫した分類を維持します。",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("ja", {
   privacy_p1: "ゼロサーバー運用アーキテクチャ：すべてブラウザ内で完結し、中央サーバーは存在しません。",
   privacy_p2: "閲覧履歴やブックマークデータの追跡・収集は一切行いません。",
   privacy_p3: "最小限の権限のみ使用し、詳細ページ解析はいつでもオフにできます。",
-  privacy_p4: "GoogleアカウントのChromeクラウド同期に完全対応しています。",
+  privacy_p4: "ブラウザ標準のブックマークツリーへ直接保存され、クラウド同期に完全対応しています。",
 
   // 指南与扩展动作
   btn_manual_backup: "手動バックアップ",

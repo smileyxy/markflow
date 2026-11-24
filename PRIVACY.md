@@ -2,7 +2,7 @@
 
 **Last Updated:** November 2026
 
-MarkFlow AI ("the Extension") is an open-source browser extension released under the GNU General Public License v3.0 (GPL-3.0). Protecting user privacy is a foundational design principle of this project. This Privacy Policy explains how data is handled when you use the Extension.
+MarkFlow AI ("the Extension") is an open-source browser extension for Chromium-based browsers (including Google Chrome and Microsoft Edge), released under the GNU General Public License v3.0 (GPL-3.0). Protecting user privacy is a foundational design principle of this project. This Privacy Policy explains how data is handled when you use the Extension.
 
 ---
 
@@ -15,15 +15,15 @@ MarkFlow AI operates with a **strictly local, zero-server architecture**:
 
 ---
 
-## 2. Chrome Permissions & Purpose
+## 2. Browser Permissions & Purpose
 
 Each permission declared in `manifest.json` is used strictly for the single purpose of organizing, saving, and searching your browser bookmarks:
 
 | Permission | Purpose |
 | :--- | :--- |
-| **`bookmarks`** | Reads your local bookmark folder tree to present folder choices and reorganization previews, and creates, renames, moves, or sorts bookmarks only when you explicitly trigger an action. |
+| **`bookmarks`** | Reads your local bookmark/favorites folder tree to present folder choices and reorganization previews, and creates, renames, moves, or sorts bookmarks only when you explicitly trigger an action. |
 | **`activeTab`** & **`scripting`** | Reads the title, URL, and optional on-demand page metadata (description and primary headings) of the active tab **solely at the moment you invoke the Extension popup or keyboard shortcut**. No background scripts monitor or record your browsing activity. On-demand page context extraction can be disabled at any time in **Preferences**. |
-| **`storage`** | Stores your local preferences, custom domain rules, domain affinity memory, and self-provided AI API credentials inside your own browser's `chrome.storage.local`. |
+| **`storage`** | Stores your local preferences, custom domain rules, domain affinity memory, and self-provided AI API credentials inside your own browser's extension local storage (`storage.local`). |
 
 ---
 
@@ -37,12 +37,12 @@ AI semantic classification and title refinement are completely optional and cont
 
 ---
 
-## 4. Chrome Web Store Policy Compliance
+## 4. Store Policy Compliance
 
-MarkFlow AI strictly adheres to the [Chrome Web Store Developer Program Policies](https://developer.chrome.com/docs/webstore/program-policies/), including all **Limited Use** requirements. Because the Extension is open-source under GPL-3.0, every network call and permission usage can be independently audited in the source code.
+MarkFlow AI strictly adheres to both the [Chrome Web Store Developer Program Policies](https://developer.chrome.com/docs/webstore/program-policies/) (including all **Limited Use** requirements) and the [Microsoft Edge Add-ons Store Developer Policies](https://learn.microsoft.com/microsoft-edge/extensions-chromium/store-policies/developer-policies). Because the Extension is open-source under GPL-3.0, every network call and permission usage can be independently audited in the source code.
 
 ---
 
 ## 5. Contact & Support
 
-If you have any questions about this Privacy Policy or how MarkFlow AI handles data, please open an issue in the [MarkFlow AI GitHub repository](https://github.com/smileyxy/markflow/issues) or reach out through the Chrome Web Store support tab.
+If you have any questions about this Privacy Policy or how MarkFlow AI handles data, please open an issue in the [MarkFlow AI GitHub repository](https://github.com/smileyxy/markflow/issues) or reach out through the corresponding extension store support page (Chrome Web Store or Microsoft Edge Add-ons).

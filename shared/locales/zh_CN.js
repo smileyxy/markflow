@@ -157,7 +157,7 @@ MarkFlowI18n.register("zh_CN", {
   ai_gemini_url_hint: "支持 Gemini API (v1beta) 与 Vertex AI (Express / 项目端点)，自动识别 API Key 或 Bearer Token；若填 /v1 或 /openai 则切换兼容协议",
   ai_quick_endpoints_label: "接口模式：",
   ai_key_label: "API 密钥 (API Key)",
-  ai_key_hint: "密钥仅保存在本地浏览器的 chrome.storage.local 中，直连所选服务商，不经过第三方中转。",
+  ai_key_hint: "密钥仅保存在浏览器本地存储（storage.local）中，直连所选服务商，不经过第三方中转。",
   ai_model_label: "模型名称 (Model ID)",
   ai_quick_models_label: "推荐模型：",
   btn_fetch_models: "从接口拉取列表",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("zh_CN", {
   pref_strip_title: "本地冗余标题智能清洗",
   pref_strip_desc: "自动剔除常见的 SEO 推广尾缀与未读计数前缀。",
   pref_shortcuts_title: "快捷键自定义指引",
-  pref_shortcuts_desc: "如需修改默认快捷键（当前为 Alt + B），可在 Chrome 原生快捷键面板中调整。",
+  pref_shortcuts_desc: "如需修改默认快捷键（当前为 Alt + B），可在浏览器原生快捷键面板中调整。",
   btn_open_shortcuts: "设置快捷键 ↗",
   pref_memory_title: "域名归类偏好记忆",
   pref_memory_desc: "自动记录您手动调整过的垂直站点目录偏好，辅助保持归类一致。",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("zh_CN", {
   privacy_p1: "零服务器运营架构：插件全部逻辑运行在本地浏览器内，无中央后端服务器，不托管任何用户数据。",
   privacy_p2: "零遥测与追踪：绝不收集、统计或上传您的浏览历史、访问记录与书签库内容。",
   privacy_p3: "最小化按需授权：仅在您主动按下快捷键唤醒插件时读取当前标签页信息，并可随时一键关闭正文摘要提取。",
-  privacy_p4: "原生兼容多端同步：所有书签直接写入 Chrome 原生书签树，无缝触发浏览器云端同步。",
+  privacy_p4: "原生兼容多端同步：所有书签直接写入浏览器原生书签树，无缝触发浏览器云端同步。",
 
   // 指南与扩展动作
   btn_manual_backup: "手动备份书签",

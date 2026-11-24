@@ -132,8 +132,7 @@ function pauseAutoSaveOnAiFailure() {
 }
 
 function isBlankOrUtilityTab(url) {
-  if (!url) return true;
-  return /^(chrome:\/\/(newtab|bookmarks|extensions)|edge:\/\/newtab|about:(blank|newtab))/i.test(url);
+  return MarkFlowEngine.platform.isUtilityTabUrl(url);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -143,7 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 填充站点图标与身份预览信息
   const faviconEl = document.getElementById("siteFavicon");
-  if (currentTab.favIconUrl && !currentTab.favIconUrl.startsWith("chrome://")) {
+  if (currentTab.favIconUrl && !MarkFlowEngine.platform.isInternalFaviconUrl(currentTab.favIconUrl)) {
     faviconEl.src = currentTab.favIconUrl;
     faviconEl.onerror = () => {
       faviconEl.src = "../icons/icon16.png";
@@ -242,7 +241,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function extractPageSemanticContext(tabId, url) {
   if (!tabId || !url || !/^https?:\/\//i.test(url)) return null;
-  if (/^https:\/\/(chrome\.google\.com|chromewebstore\.google\.com)/i.test(url)) return null;
+  if (MarkFlowEngine.platform.isRestrictedStoreUrl(url)) return null;
 
   const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 550));
 

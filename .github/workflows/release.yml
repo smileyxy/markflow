@@ -1,4 +1,4 @@
-name: Release & Sync Chrome Web Store
+name: Release & Sync Extension Stores
 
 on:
   push:
@@ -15,6 +15,11 @@ on:
         required: false
         default: true
         type: boolean
+      publish_edge:
+        description: "配置 Secrets 后自动上传并提交至 Microsoft Edge Add-ons"
+        required: false
+        default: true
+        type: boolean
   workflow_dispatch:
     inputs:
       tag_name:
@@ -27,14 +32,24 @@ on:
         required: false
         default: true
         type: boolean
+      publish_edge:
+        description: "同步上传并提交审核至 Microsoft Edge Add-ons"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build, Release & Publish
+  build-release:
+    name: Build & GitHub Release
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      zip_name: ${{ steps.meta.outputs.zip_name }}
+      checkout_ref: ${{ steps.meta.outputs.checkout_ref }}
 
     steps:
       - name: Resolve target ref
@@ -77,12 +92,17 @@ jobs:
             exit 1
           fi
 
-          find background shared popup options -name "*.js" -print0 | xargs -0 -n1 node --check
+          find background shared popup options .github/scripts -name "*.js" -print0 | xargs -0 -n1 node --check
+          CHECKOUT_REF="${{ steps.resolve_ref.outputs.tag }}"
+          if [ -z "$CHECKOUT_REF" ]; then
+            CHECKOUT_REF="${{ github.ref }}"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "zip_name=markflow-v${VERSION}.zip" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=${CHECKOUT_REF}" >> "$GITHUB_OUTPUT"
 
-      - name: Build clean Chrome extension package
+      - name: Build clean extension package
         run: |
           mkdir -p dist
           zip -r "dist/${{ steps.meta.outputs.zip_name }}" \
@@ -176,7 +196,10 @@ jobs:
             sections.push(`- **Commits:** ${count}${firstCommit ? ` · **Initial:** \`${firstCommit.slice(0, 7)}\`` : ""}`);
           }
 
-          fs.writeFileSync("release-notes.md", sections.join("\n") + "\n", "utf8");
+          const notesContent = sections.join("\n") + "\n";
+          fs.writeFileSync("release-notes.md", notesContent, "utf8");
+          fs.mkdirSync("dist", { recursive: true });
+          fs.writeFileSync("dist/release-notes.md", notesContent, "utf8");
           EOF
 
       - name: Create or update GitHub Release
@@ -194,132 +217,81 @@ jobs:
               --notes-file release-notes.md
           fi
 
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-${{ steps.meta.outputs.tag }}
+          path: dist
+          retention-days: 1
+
+  publish-chrome:
+    name: Publish to Chrome Web Store
+    needs: build-release
+    if: ${{ github.event_name == 'push' || inputs.publish_cws == true }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-release.outputs.checkout_ref }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package-${{ needs.build-release.outputs.tag }}
+          path: dist
+
       - name: Upload & publish to Chrome Web Store
         id: cws
-        if: ${{ github.event_name == 'push' || inputs.publish_cws == true }}
         env:
           CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
           CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-          ZIP_PATH: dist/${{ steps.meta.outputs.zip_name }}
-          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          ZIP_NAME: ${{ steps.meta.outputs.zip_name }}
-        run: |
-          node <<'EOF'
-          const fs = require("fs");
+          ZIP_PATH: dist/${{ needs.build-release.outputs.zip_name }}
+          RELEASE_TAG: ${{ needs.build-release.outputs.tag }}
+          ZIP_NAME: ${{ needs.build-release.outputs.zip_name }}
+        run: node .github/scripts/publish-cws.js
 
-          async function main() {
-            const {
-              CWS_EXTENSION_ID: extId,
-              CWS_CLIENT_ID: clientId,
-              CWS_CLIENT_SECRET: clientSecret,
-              CWS_REFRESH_TOKEN: refreshToken,
-              ZIP_PATH: zipPath,
-              RELEASE_TAG: releaseTag,
-              ZIP_NAME: zipName,
-              GITHUB_OUTPUT: ghOutput,
-              GITHUB_STEP_SUMMARY: ghSummary
-            } = process.env;
+  publish-edge:
+    name: Publish to Microsoft Edge Add-ons
+    needs: build-release
+    if: ${{ github.event_name == 'push' || inputs.publish_edge == true }}
+    runs-on: ubuntu-latest
 
-            if (!extId || !clientId || !clientSecret || !refreshToken) {
-              if (ghOutput) fs.appendFileSync(ghOutput, "status=skipped\n");
-              if (ghSummary) {
-                fs.appendFileSync(
-                  ghSummary,
-                  [
-                    "### Chrome Web Store 自动同步已跳过",
-                    "未检测到完整的商店 API Secrets（`CWS_EXTENSION_ID` / `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN`）。",
-                    `GitHub Release（\`${zipName}\`）已正常发布；配置好 Secrets 后可随时手动重新运行本工作流完成商店自动提交。`
-                  ].join("\n") + "\n"
-                );
-              }
-              return;
-            }
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build-release.outputs.checkout_ref }}
+          persist-credentials: false
 
-            const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                client_id: clientId,
-                client_secret: clientSecret,
-                refresh_token: refreshToken,
-                grant_type: "refresh_token"
-              })
-            });
-            const tokenData = await tokenResp.json().catch(() => ({}));
-            if (!tokenResp.ok || !tokenData.access_token) {
-              console.error("OAuth token exchange failed:", {
-                httpStatus: tokenResp.status,
-                error: tokenData.error || "unknown_error",
-                error_description: tokenData.error_description || ""
-              });
-              process.exit(1);
-            }
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-            const accessToken = String(tokenData.access_token);
-            console.log(`::add-mask::${accessToken}`);
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package-${{ needs.build-release.outputs.tag }}
+          path: dist
 
-            const zipBuffer = fs.readFileSync(zipPath);
-            const uploadResp = await fetch(
-              `https://www.googleapis.com/upload/chromewebstore/v1.1/items/${encodeURIComponent(extId)}`,
-              {
-                method: "PUT",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "x-goog-api-version": "2"
-                },
-                body: zipBuffer
-              }
-            );
-            const uploadData = await uploadResp.json().catch(() => ({}));
-            console.log("Upload status:", JSON.stringify({
-              httpStatus: uploadResp.status,
-              uploadState: uploadData.uploadState,
-              itemError: uploadData.itemError || []
-            }));
-            if (!uploadResp.ok || uploadData.uploadState !== "SUCCESS") {
-              console.error("Chrome Web Store upload failed.");
-              process.exit(1);
-            }
-
-            const publishResp = await fetch(
-              `https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(extId)}/publish?publishTarget=default`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "x-goog-api-version": "2",
-                  "Content-Length": "0"
-                }
-              }
-            );
-            const publishData = await publishResp.json().catch(() => ({}));
-            console.log("Publish status:", JSON.stringify({
-              httpStatus: publishResp.status,
-              status: publishData.status,
-              statusDetail: publishData.statusDetail
-            }));
-            if (!publishResp.ok || !Array.isArray(publishData.status) || !publishData.status.includes("OK")) {
-              console.error("Chrome Web Store publish failed.");
-              process.exit(1);
-            }
-
-            if (ghOutput) fs.appendFileSync(ghOutput, "status=published\n");
-            if (ghSummary) {
-              fs.appendFileSync(
-                ghSummary,
-                [
-                  "### Chrome Web Store 自动同步成功",
-                  `- 版本：\`${releaseTag}\``,
-                  "- 状态：已自动上传并提交 Chrome 商店审核"
-                ].join("\n") + "\n"
-              );
-            }
-          }
-
-          main().catch(err => {
-            console.error("Unexpected publish error:", err && err.message ? err.message : String(err));
-            process.exit(1);
-          });
-          EOF
+      - name: Upload & publish to Microsoft Edge Add-ons
+        id: edge
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          ZIP_PATH: dist/${{ needs.build-release.outputs.zip_name }}
+          RELEASE_TAG: ${{ needs.build-release.outputs.tag }}
+          ZIP_NAME: ${{ needs.build-release.outputs.zip_name }}
+          RELEASE_NOTES_FILE: dist/release-notes.md
+        run: node .github/scripts/publish-edge.js

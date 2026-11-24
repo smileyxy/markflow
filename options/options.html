@@ -428,7 +428,7 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
               </button>
             </div>
-            <span class="form-hint" data-i18n="ai_key_hint">密钥仅保存在本地浏览器的 chrome.storage.local 中，直连所选服务商，不经过第三方中转。</span>
+            <span class="form-hint" data-i18n="ai_key_hint">密钥仅保存在浏览器本地存储（storage.local）中，直连所选服务商，不经过第三方中转。</span>
           </div>
 
           <div class="form-group">
@@ -646,7 +646,7 @@
               <div class="preference-item">
                 <div class="pref-info">
                   <span class="pref-title" data-i18n="pref_shortcuts_title">快捷键自定义指引</span>
-                  <span class="pref-desc" data-i18n="pref_shortcuts_desc">如需修改默认快捷键（当前为 Alt + B），可在 Chrome 原生快捷键面板中调整。</span>
+                  <span class="pref-desc" data-i18n="pref_shortcuts_desc">如需修改默认快捷键（当前为 Alt + B），可在浏览器原生快捷键面板中调整。</span>
                 </div>
                 <div class="pref-control">
                   <button id="btnOpenShortcuts" class="btn btn-secondary" type="button" data-i18n="btn_open_shortcuts">设置快捷键 ↗</button>
@@ -885,7 +885,7 @@
                 <li data-i18n="privacy_p1">零服务器运营架构：插件全部逻辑运行在本地浏览器内，无中央后端服务器，不托管任何用户数据。</li>
                 <li data-i18n="privacy_p2">零遥测与追踪：绝不收集、统计或上传您的浏览历史、访问记录与书签库内容。</li>
                 <li data-i18n="privacy_p3">最小化按需授权：仅在您主动按下快捷键唤醒插件时读取当前标签页信息，并可随时一键关闭正文摘要提取。</li>
-                <li data-i18n="privacy_p4">原生兼容多端同步：所有书签直接写入 Chrome 原生书签树，无缝触发浏览器云端同步。</li>
+                <li data-i18n="privacy_p4">原生兼容多端同步：所有书签直接写入浏览器原生书签树，无缝触发浏览器云端同步。</li>
               </ul>
               <p class="about-license-note" data-i18n="about_sponsor_note">MarkFlow 基于 GNU GPL-3.0 协议开源，坚持零服务器运营与永久无广告。</p>
             </div>
@@ -1031,6 +1031,7 @@
 
   <!-- 核心引擎子模块 -->
   <script src="../shared/constants.js"></script>
+  <script src="../shared/platform.js"></script>
   <script src="../shared/utils.js"></script>
   <script src="../shared/tree.js"></script>
   <script src="../shared/rules.js"></script>

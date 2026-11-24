@@ -157,7 +157,7 @@ MarkFlowI18n.register("ko", {
   ai_gemini_url_hint: "Gemini API (v1beta) 및 Vertex AI (Express / 프로젝트 엔드포인트) 지원 (API 키 또는 Bearer 토큰 자동 감지, /v1·/openai는 호환 모드)",
   ai_quick_endpoints_label: "엔드포인트 프리셋:",
   ai_key_label: "API 키",
-  ai_key_hint: "로컬 브라우저의 chrome.storage.local에만 저장되며 선택한 공급자로 직접 전송됩니다.",
+  ai_key_hint: "브라우저 로컬 저장소(storage.local)에만 저장되며 선택한 공급자로 직접 전송됩니다.",
   ai_model_label: "모델 이름 (Model ID)",
   ai_quick_models_label: "추천 모델:",
   btn_fetch_models: "모델 목록 불러오기",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("ko", {
   pref_strip_title: "불필요한 SEO 접미사 자동 제거",
   pref_strip_desc: "반복되는 사이트 접미사와 읽지 않은 알림 숫자를 자동으로 제거합니다.",
   pref_shortcuts_title: "단축키 사용자 지정",
-  pref_shortcuts_desc: "Chrome 기본 단축키 설정 화면에서 단축키(기본 Alt + B)를 변경할 수 있습니다.",
+  pref_shortcuts_desc: "브라우저의 기본 확장 프로그램 단축키 설정 화면에서 단축키(기본 Alt + B)를 변경할 수 있습니다.",
   btn_open_shortcuts: "단축키 설정 ↗",
   pref_memory_title: "도메인 분류 메모리",
   pref_memory_desc: "직접 선택한 사이트별 폴더 선호도를 기억하여 일관성을 유지합니다.",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("ko", {
   privacy_p1: "제로 서버 아키텍처: 모든 로직은 로컬 브라우저에서 실행되며 중앙 백엔드 서버가 없습니다.",
   privacy_p2: "추적 및 텔레메트리 없음: 방문 기록이나 북마크 데이터를 절대 수집하거나 전송하지 않습니다.",
   privacy_p3: "최소 권한 원칙: 사용자가 호출한 순간에만 현재 탭 정보를 읽으며 심층 읽기는 언제든 끌 수 있습니다.",
-  privacy_p4: "Chrome 클라우드 동기화 완벽 호환: 네이티브 북마크 트리에 직접 기록됩니다.",
+  privacy_p4: "브라우저 클라우드 동기화 완벽 호환: 네이티브 북마크 트리에 직접 기록됩니다.",
 
   // 指南与扩展动作
   btn_manual_backup: "수동 백업",

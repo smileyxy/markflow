@@ -28,6 +28,11 @@ on:
         required: false
         default: true
         type: boolean
+      publish_edge:
+        description: "同步上传并提交审核至 Microsoft Edge Add-ons"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -125,10 +130,11 @@ jobs:
           git push origin "${TAG}"
 
   publish:
-    name: Trigger Release & Chrome Web Store Sync
+    name: Trigger Release & Store Sync
     needs: bump
     uses: ./.github/workflows/release.yml
     with:
       tag_name: ${{ needs.bump.outputs.tag_name }}
       publish_cws: ${{ inputs.publish_cws }}
+      publish_edge: ${{ inputs.publish_edge }}
     secrets: inherit

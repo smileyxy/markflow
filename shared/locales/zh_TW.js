@@ -157,7 +157,7 @@ MarkFlowI18n.register("zh_TW", {
   ai_gemini_url_hint: "支援 Gemini API (v1beta) 與 Vertex AI (Express / 專案端點)，自動識別 API Key 或 Bearer Token；若填 /v1 或 /openai 則切換相容協定",
   ai_quick_endpoints_label: "介面模式：",
   ai_key_label: "API 金鑰 (API Key)",
-  ai_key_hint: "金鑰僅儲存在本地瀏覽器的 chrome.storage.local 中，直連所選服務商，絕不經過第三方中轉。",
+  ai_key_hint: "金鑰僅儲存在瀏覽器本地儲存空間（storage.local）中，直連所選服務商，絕不經過第三方中轉。",
   ai_model_label: "模型名稱 (Model ID)",
   ai_quick_models_label: "推薦模型：",
   btn_fetch_models: "從介面取得清單",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("zh_TW", {
   pref_strip_title: "本地冗餘標題智慧清洗",
   pref_strip_desc: "自動剔除常見的 SEO 推廣尾綴與未讀數字前綴。",
   pref_shortcuts_title: "快捷鍵自訂指引",
-  pref_shortcuts_desc: "如需修改預設快捷鍵（目前為 Alt + B），可在 Chrome 原生快捷鍵頁面調整。",
+  pref_shortcuts_desc: "如需修改預設快捷鍵（目前為 Alt + B），可在瀏覽器原生快捷鍵頁面調整。",
   btn_open_shortcuts: "設定快捷鍵 ↗",
   pref_memory_title: "網域歸類偏好記憶",
   pref_memory_desc: "自動記錄您手動調整過的垂直站點資料夾偏好，協助維持歸類一致。",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("zh_TW", {
   privacy_p1: "零伺服器運作架構：擴充功能全部邏輯皆在本地瀏覽器執行，無中央後端伺服器，不託管任何使用者資料。",
   privacy_p2: "零遙測與追蹤：絕不蒐集、統計或上傳您的瀏覽紀錄與書籤庫內容。",
   privacy_p3: "最小化按需授權：僅於您主動按下快捷鍵喚醒擴充功能時讀取目前分頁資訊，並可隨時關閉摘要擷取。",
-  privacy_p4: "原生相容多裝置同步：所有書籤直接寫入 Chrome 原生書籤樹，無縫觸發瀏覽器雲端同步。",
+  privacy_p4: "原生相容多裝置同步：所有書籤直接寫入瀏覽器原生書籤樹，無縫觸發瀏覽器雲端同步。",
 
   // 指南与扩展动作
   btn_manual_backup: "手動備份書籤",

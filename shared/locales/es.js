@@ -157,7 +157,7 @@ MarkFlowI18n.register("es", {
   ai_gemini_url_hint: "Compatible con Gemini API (v1beta) y Vertex AI (Express / por proyecto) con API Key o Bearer Token; /v1 o /openai cambia a modo compatible",
   ai_quick_endpoints_label: "Endpoints:",
   ai_key_label: "Clave API (API Key)",
-  ai_key_hint: "Guardada localmente en chrome.storage.local y enviada directamente a tu proveedor.",
+  ai_key_hint: "Guardada localmente en el almacenamiento del navegador (storage.local) y enviada directamente a tu proveedor.",
   ai_model_label: "ID del modelo",
   ai_quick_models_label: "Modelos recomendados:",
   btn_fetch_models: "Obtener modelos",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("es", {
   pref_strip_title: "Limpieza local de sufijos SEO",
   pref_strip_desc: "Elimina automáticamente sufijos repetitivos y contadores no leídos.",
   pref_shortcuts_title: "Personalizar atajos",
-  pref_shortcuts_desc: "Cambia el atajo predeterminado (Alt + B) desde la configuración de Chrome.",
+  pref_shortcuts_desc: "Cambia el atajo predeterminado (Alt + B) desde la configuración de atajos de tu navegador.",
   btn_open_shortcuts: "Abrir atajos ↗",
   pref_memory_title: "Memoria de afinidad por dominio",
   pref_memory_desc: "Recuerda las carpetas elegidas manualmente para sitios recurrentes.",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("es", {
   privacy_p1: "Sin servidores: Todo se ejecuta 100 % en local dentro de tu navegador.",
   privacy_p2: "Sin telemetría: Nunca recopilamos ni enviamos tu historial o tus marcadores.",
   privacy_p3: "Permisos mínimos: Lee la pestaña actual solo al invocar la extensión; lectura profunda desactivable.",
-  privacy_p4: "Compatible con Chrome Sync: Escribe directamente en el árbol nativo de Chrome.",
+  privacy_p4: "Compatible con la sincronización del navegador: Escribe directamente en el árbol nativo de marcadores.",
 
   // 指南与扩展动作
   btn_manual_backup: "Respaldo manual",

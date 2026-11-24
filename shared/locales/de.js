@@ -157,7 +157,7 @@ MarkFlowI18n.register("de", {
   ai_gemini_url_hint: "Unterstützt Gemini API (v1beta) & Vertex AI (Express-/Projekt-Endpunkte) mit API-Key oder Bearer-Token; /v1 oder /openai nutzt OpenAI-Modus",
   ai_quick_endpoints_label: "Endpunkt-Vorlagen:",
   ai_key_label: "API-Schlüssel",
-  ai_key_hint: "Wird lokal in chrome.storage.local gespeichert und direkt an Ihren Anbieter gesendet.",
+  ai_key_hint: "Wird lokal im Browser-Speicher (storage.local) gespeichert und direkt an Ihren Anbieter gesendet.",
   ai_model_label: "Modell-ID",
   ai_quick_models_label: "Empfohlene Modelle:",
   btn_fetch_models: "Modelle abrufen",
@@ -324,7 +324,7 @@ MarkFlowI18n.register("de", {
   pref_strip_title: "SEO-Titelanhänge lokal entfernen",
   pref_strip_desc: "Entfernt automatisch wiederkehrende Seiten-Suffixe und Zähler.",
   pref_shortcuts_title: "Tastenkürzel anpassen",
-  pref_shortcuts_desc: "Ändern Sie das Kürzel (Standard Alt + B) in den Chrome-Einstellungen.",
+  pref_shortcuts_desc: "Ändern Sie das Kürzel (Standard Alt + B) in den Erweiterungs-Tastenkürzeln Ihres Browsers.",
   btn_open_shortcuts: "Kürzel öffnen ↗",
   pref_memory_title: "Domain-Präferenzspeicher",
   pref_memory_desc: "Merkt sich manuell gewählte Ordner für wiederkehrende Websites.",
@@ -366,7 +366,7 @@ MarkFlowI18n.register("de", {
   privacy_p1: "Ohne Server: Alles läuft zu 100 % lokal in Ihrem Browser ohne zentrales Backend.",
   privacy_p2: "Keine Telemetrie: Kein Tracking, keine Sammlung von Browserverlauf oder Lesezeichen.",
   privacy_p3: "Minimale Rechte: Liest Tab-Metadaten nur bei aktivem Aufruf; Kontextlesen jederzeit abschaltbar.",
-  privacy_p4: "Chrome-Sync kompatibel: Speichert direkt im nativen Chrome-Lesezeichenbaum.",
+  privacy_p4: "Browser-Sync kompatibel: Speichert direkt im nativen Lesezeichenbaum Ihres Browsers.",
 
   // 指南与扩展动作
   btn_manual_backup: "Manuelles Backup",

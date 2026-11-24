@@ -9,6 +9,14 @@
   "use strict";
 
   const constants = global.MarkFlowModules.constants;
+  const platform = (global.MarkFlowModules && global.MarkFlowModules.platform) || {
+    isRootBookmarkNode: id => ["0", "1", "2", "3"].includes(String(id)),
+    isRootFolderName: name =>
+      !name ||
+      /^(根目录|书签栏|其他书签|收藏夹栏|其他收藏夹|Bookmarks Bar|Other Bookmarks|Favorites Bar|Other Favorites)$/i.test(
+        String(name).trim()
+      )
+  };
   const utils = global.MarkFlowModules.utils;
   const tree = global.MarkFlowModules.tree;
   const rules = global.MarkFlowModules.rules;
@@ -248,7 +256,9 @@ ${titleStyleRule}
       const bm = bookmarks[Math.floor(i * step)];
       const u = parseUrlInfo(bm.url);
       const origCtx =
-        bm.parentTitle && !/^(根目录|书签栏|其他书签|Bookmarks Bar|Other Bookmarks)$/i.test(bm.parentTitle)
+        bm.parentTitle &&
+        !platform.isRootBookmarkNode(bm.parentId) &&
+        !platform.isRootFolderName(bm.parentTitle)
           ? ` | 原目录:${bm.parentTitle}`
           : "";
       const hostAndPath = u.valid
@@ -453,7 +463,7 @@ ${fullInventoryLines.join("\n")}
       parentId: "0",
       directBookmarkCount: 0,
       samples: [],
-      searchKey: "bookmarks bar 书签栏"
+      searchKey: "bookmarks bar favorites bar 书签栏 收藏夹栏"
     };
     folders.push(rootBar);
     folderMap.set("1", rootBar);
@@ -1007,7 +1017,9 @@ ${ctxLines.join("\n")}
         ? ` | 同站锚点ID:${it.domainAffinity.folderId}(${it.domainAffinity.breadcrumb})`
         : "";
       const origFolderHint =
-        it.bm.parentTitle && !/^(根目录|书签栏|其他书签|Bookmarks Bar|Other Bookmarks)$/i.test(it.bm.parentTitle)
+        it.bm.parentTitle &&
+        !platform.isRootBookmarkNode(it.bm.parentId) &&
+        !platform.isRootFolderName(it.bm.parentTitle)
           ? ` | 原目录路径:${it.bm.parentTitle}`
           : "";
       return `[${idx}] 原标题: ${it.bm.title}${origFolderHint} | 站点与路径:${uInfo.hostKey || uInfo.hostname}${uInfo.pathHint}${anchorStr} | URL: ${it.bm.url}`;
@@ -1221,6 +1233,7 @@ ${itemLines.join("\n")}
     sorter,
     llm,
     {
+      platform,
       resolveAiOutputLanguage,
       buildClassifierSystemPrompt,
       sanitizeClassificationOutput,

@@ -76,7 +76,7 @@
       .addEventListener("click", () => persistPreferences(t("pref_toast_all_saved")));
 
     document.getElementById("btnOpenShortcuts").addEventListener("click", () => {
-      chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+      chrome.tabs.create({ url: MarkFlowEngine.platform.getShortcutsPageUrl() });
     });
 
     document.getElementById("btnClearDomainMemory").addEventListener("click", async () => {
