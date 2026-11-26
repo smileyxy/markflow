@@ -16,6 +16,7 @@ async function main() {
     CWS_CLIENT_ID: clientId,
     CWS_CLIENT_SECRET: clientSecret,
     CWS_REFRESH_TOKEN: refreshToken,
+    REQUIRE_PUBLISH: requirePublishRaw,
     ZIP_PATH: zipPath,
     RELEASE_TAG: releaseTag,
     ZIP_NAME: zipName,
@@ -23,14 +24,46 @@ async function main() {
     GITHUB_STEP_SUMMARY: ghSummary
   } = process.env;
 
-  if (!extId || !clientId || !clientSecret || !refreshToken) {
+  const missingSecrets = [
+    ["CWS_EXTENSION_ID", extId],
+    ["CWS_CLIENT_ID", clientId],
+    ["CWS_CLIENT_SECRET", clientSecret],
+    ["CWS_REFRESH_TOKEN", refreshToken]
+  ]
+    .filter(([, val]) => !val)
+    .map(([name]) => name);
+
+  const requirePublish = String(requirePublishRaw || "").toLowerCase() === "true";
+
+  if (missingSecrets.length > 0) {
+    const missingList = missingSecrets.join(", ");
+    if (requirePublish) {
+      console.error(
+        `::error::Chrome Web Store publish failed — missing required GitHub Secrets: ${missingList}`
+      );
+      if (ghSummary) {
+        fs.appendFileSync(
+          ghSummary,
+          [
+            "### ❌ Chrome Web Store 发布失败（缺少必要 Secrets）",
+            `- 缺失 Secret：\`${missingList}\``,
+            "- 本次由 `workflow_dispatch` 显式启用了 Chrome 商店发布，请在仓库 Settings → Secrets and variables → Actions 补齐后重试。"
+          ].join("\n") + "\n"
+        );
+      }
+      process.exit(1);
+    }
+
+    console.warn(
+      `::warning::Chrome Web Store auto-publish skipped — missing GitHub Secrets: ${missingList}`
+    );
     if (ghOutput) fs.appendFileSync(ghOutput, "status=skipped\n");
     if (ghSummary) {
       fs.appendFileSync(
         ghSummary,
         [
-          "### Chrome Web Store 自动同步已跳过",
-          "未检测到完整的商店 API Secrets（`CWS_EXTENSION_ID` / `CWS_CLIENT_ID` / `CWS_CLIENT_SECRET` / `CWS_REFRESH_TOKEN`）。",
+          "### ⚠️ Chrome Web Store 自动同步已跳过",
+          `未检测到完整的商店 API Secrets（缺失：\`${missingList}\`）。`,
           `GitHub Release（\`${zipName}\`）已正常发布；配置好 Secrets 后可随时手动重新运行本工作流完成商店自动提交。`
         ].join("\n") + "\n"
       );

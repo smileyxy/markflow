@@ -84,6 +84,7 @@ async function main() {
     EDGE_PRODUCT_ID: productId,
     EDGE_CLIENT_ID: clientId,
     EDGE_API_KEY: apiKey,
+    REQUIRE_PUBLISH: requirePublishRaw,
     ZIP_PATH: zipPath,
     RELEASE_TAG: releaseTag,
     ZIP_NAME: zipName,
@@ -92,15 +93,46 @@ async function main() {
     GITHUB_STEP_SUMMARY: ghSummary
   } = process.env;
 
-  if (!productId || !clientId || !apiKey) {
+  const missingSecrets = [
+    ["EDGE_PRODUCT_ID", productId],
+    ["EDGE_CLIENT_ID", clientId],
+    ["EDGE_API_KEY", apiKey]
+  ]
+    .filter(([, val]) => !val)
+    .map(([name]) => name);
+
+  const requirePublish = String(requirePublishRaw || "").toLowerCase() === "true";
+
+  if (missingSecrets.length > 0) {
+    const missingList = missingSecrets.join(", ");
+    if (requirePublish) {
+      console.error(
+        `::error::Microsoft Edge Add-ons publish failed — missing required GitHub Secrets: ${missingList}`
+      );
+      if (ghSummary) {
+        fs.appendFileSync(
+          ghSummary,
+          [
+            "### ❌ Microsoft Edge Add-ons 发布失败（缺少必要 Secrets）",
+            `- 缺失 Secret：\`${missingList}\``,
+            "- 本次由 `workflow_dispatch` 显式启用了 Edge 商店发布，请在仓库 Settings → Secrets and variables → Actions 补齐后重试。"
+          ].join("\n") + "\n"
+        );
+      }
+      process.exit(1);
+    }
+
+    console.warn(
+      `::warning::Microsoft Edge Add-ons auto-publish skipped — missing GitHub Secrets: ${missingList}`
+    );
     if (ghOutput) fs.appendFileSync(ghOutput, "status=skipped\n");
     if (ghSummary) {
       fs.appendFileSync(
         ghSummary,
         [
-          "### Microsoft Edge Add-ons 自动同步已跳过",
-          "未检测到完整的 Edge 商店 API Secrets（`EDGE_PRODUCT_ID` / `EDGE_CLIENT_ID` / `EDGE_API_KEY`）。",
-          `GitHub Release（\`${zipName}\`）已正常发布；完成首次 Partner Center 人工提审过审并配置好 Secrets 后，可随时重新运行本工作流自动提交 Edge 商店。`
+          "### ⚠️ Microsoft Edge Add-ons 自动同步已跳过",
+          `未检测到完整的 Edge 商店 API Secrets（缺失：\`${missingList}\`）。`,
+          `GitHub Release（\`${zipName}\`）已正常发布；配置好 Secrets 后可随时手动重新运行本工作流自动提交 Edge 商店。`
         ].join("\n") + "\n"
       );
     }
