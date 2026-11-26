@@ -17,6 +17,21 @@
     return err;
   }
 
+  /** 构造标准中断异常，用于用户主动取消请求时与普通网络/超时故障区分 */
+  function createAbortError(message = "Operation aborted") {
+    const err = new Error(message);
+    err.name = "AbortError";
+    return err;
+  }
+
+  /** 判断异常是否由 AbortSignal / AbortController 主动中止引发 */
+  function isAbortError(err) {
+    if (!err) return false;
+    if (err.name === "AbortError" || err.code === 20) return true;
+    const msg = String(err.message || err || "");
+    return /aborted|AbortError/i.test(msg);
+  }
+
   /** 裁剪并脱敏接口报错正文：去掉冗长的配额指标说明与文档外链，保留简短可读原因 */
   function sanitizeErrorExcerpt(raw, maxLen = 110) {
     const src = String(raw || "").trim();
@@ -145,7 +160,54 @@
       providerLabel: preset.name,
       baseUrl: (saved.baseUrl || cfg.baseUrl || preset.baseUrl || "").trim(),
       apiKey: (saved.apiKey || cfg.apiKey || preset.apiKey || "").trim(),
-      model: (saved.model || cfg.model || preset.model || "").trim()
+      model: (saved.model || cfg.model || preset.model || "").trim(),
+      vertexPriority: Boolean(
+        saved.vertexPriority !== undefined ? saved.vertexPriority : cfg.vertexPriority
+      )
+    };
+  }
+
+  /** 官方支持 Vertex AI Priority PayGo 的端点主机及其可选权限模式 */
+  const VERTEX_PRIORITY_OFFICIAL_HOSTS = new Map([
+    ["aiplatform.googleapis.com", "https://aiplatform.googleapis.com/*"],
+    ["us-aiplatform.googleapis.com", "https://us-aiplatform.googleapis.com/*"],
+    ["eu-aiplatform.googleapis.com", "https://eu-aiplatform.googleapis.com/*"]
+  ]);
+
+  /** 解析 Base URL 对应的 Vertex AI Priority 支持情况与所需的官方可选域名权限 */
+  function getVertexPriorityOriginInfo(baseUrl) {
+    const raw = (baseUrl || "").trim();
+    if (!raw) {
+      return { supported: false, isOfficialGoogle: false, originPattern: "" };
+    }
+    let normalized = raw;
+    if (!/^https?:\/\//i.test(normalized)) {
+      normalized = `https://${normalized}`;
+    }
+    try {
+      const host = new URL(normalized).hostname.toLowerCase();
+      if (VERTEX_PRIORITY_OFFICIAL_HOSTS.has(host)) {
+        return {
+          supported: true,
+          isOfficialGoogle: true,
+          originPattern: VERTEX_PRIORITY_OFFICIAL_HOSTS.get(host)
+        };
+      }
+      if (/(?:^|[.-])aiplatform\.googleapis\.com$/i.test(host)) {
+        return { supported: false, isOfficialGoogle: true, originPattern: "" };
+      }
+      return { supported: true, isOfficialGoogle: false, originPattern: "" };
+    } catch (e) {
+      return { supported: false, isOfficialGoogle: false, originPattern: "" };
+    }
+  }
+
+  /** 生成 Vertex AI Priority PayGo 专用请求头 */
+  function buildVertexPriorityHeaders(enabled) {
+    if (!enabled) return {};
+    return {
+      "X-Vertex-AI-LLM-Request-Type": "shared",
+      "X-Vertex-AI-LLM-Shared-Request-Type": "priority"
     };
   }
 
@@ -271,7 +333,7 @@
   /** 为 OpenRouter 请求附带标准来源标识 */
   function applyOpenRouterHeaders(headers, baseUrl) {
     if (/openrouter\.ai/i.test(baseUrl || "")) {
-      headers["HTTP-Referer"] = "https://github.com/smileyxy/markflow";
+      headers["HTTP-Referer"] = "https://markflow.smileyxy.dpdns.org/";
       headers["X-Title"] = "MarkFlow AI";
     }
     return headers;
@@ -389,6 +451,7 @@
       }
 
       if (fallbackBase && fallbackBase !== effectiveBase) {
+        if (signal && signal.aborted) throw createAbortError();
         effectiveBase = fallbackBase;
         endpoint = `${effectiveBase}/models/${encodedModel}:${action}`;
         res = await doPost(endpoint);
@@ -817,7 +880,18 @@
     }
   }
 
-  async function callGeminiNative({ baseUrl, apiKey, model, systemPrompt, userPrompt, jsonSchema }) {
+  async function callGeminiNative({
+    provider,
+    baseUrl,
+    apiKey,
+    model,
+    systemPrompt,
+    userPrompt,
+    jsonSchema,
+    vertexPriority = false,
+    signal = null
+  }) {
+    if (signal && signal.aborted) throw createAbortError();
     const cleanBase = resolveGeminiEndpointBase(baseUrl);
     const isVertex = isVertexAiUrl(cleanBase);
     const cleanModel = (model || "gemini-3.8-flash")
@@ -845,7 +919,11 @@
       generationConfig
     };
 
-    const headers = buildGeminiAuthHeaders(apiKey, true);
+    const useVertexPriority = Boolean(isVertex && (!provider || provider === "gemini") && vertexPriority);
+    const headers = Object.assign(
+      buildGeminiAuthHeaders(apiKey, true),
+      buildVertexPriorityHeaders(useVertexPriority)
+    );
 
     let { res, endpoint, cachedErrJson } = await postGeminiWithVertexRouting({
       cleanBase,
@@ -854,11 +932,13 @@
       action: "generateContent",
       isVertex,
       headers,
-      body: JSON.stringify(primaryPayload)
+      body: JSON.stringify(primaryPayload),
+      signal
     });
 
     // 若特定模型或反代不支持 responseSchema / systemInstruction，则逐级降级重试（保留 role 以兼容 Vertex AI）
     if (res.status === 400) {
+      if (signal && signal.aborted) throw createAbortError();
       cachedErrJson = null;
       const combinedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
       res = await fetch(endpoint, {
@@ -870,16 +950,19 @@
             temperature: 0,
             responseMimeType: "application/json"
           }
-        })
+        }),
+        ...(signal ? { signal } : {})
       });
 
       if (res.status === 400) {
+        if (signal && signal.aborted) throw createAbortError();
         res = await fetch(endpoint, {
           method: "POST",
           headers,
           body: JSON.stringify({
             contents: [{ role: "user", parts: [{ text: combinedPrompt }] }]
-          })
+          }),
+          ...(signal ? { signal } : {})
         });
       }
     }
@@ -909,7 +992,8 @@
     return extractJsonFromText(rawText);
   }
 
-  async function callOpenAICompatible({ baseUrl, apiKey, model, systemPrompt, userPrompt }) {
+  async function callOpenAICompatible({ baseUrl, apiKey, model, systemPrompt, userPrompt, signal = null }) {
+    if (signal && signal.aborted) throw createAbortError();
     const cleanBase = (baseUrl || "").trim().replace(/\/+$/, "");
     const endpoint = /\/chat\/completions$/i.test(cleanBase)
       ? cleanBase
@@ -938,11 +1022,13 @@
     let res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      ...(signal ? { signal } : {})
     });
 
     // 参数不兼容导致 400 时，合并为单条 user 消息进行最简兼容请求
     if (res.status === 400) {
+      if (signal && signal.aborted) throw createAbortError();
       const mergedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
       res = await fetch(endpoint, {
         method: "POST",
@@ -950,7 +1036,8 @@
         body: JSON.stringify({
           model,
           messages: [{ role: "user", content: mergedPrompt }]
-        })
+        }),
+        ...(signal ? { signal } : {})
       });
     }
 
@@ -969,7 +1056,8 @@
     return extractJsonFromText(rawText);
   }
 
-  async function callAnthropicNative({ baseUrl, apiKey, model, systemPrompt, userPrompt }) {
+  async function callAnthropicNative({ baseUrl, apiKey, model, systemPrompt, userPrompt, signal = null }) {
+    if (signal && signal.aborted) throw createAbortError();
     const cleanBase = normalizeAnthropicBaseUrl(baseUrl);
     const endpoint = `${cleanBase}/messages`;
     const body = {
@@ -983,7 +1071,8 @@
     const res = await fetch(endpoint, {
       method: "POST",
       headers: buildAnthropicHeaders(apiKey, true),
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      ...(signal ? { signal } : {})
     });
 
     if (!res.ok) {
@@ -1016,7 +1105,14 @@
   }
 
   /** 发送最小探测消息验证接口地址、密钥与模型 ID 是否可用 */
-  async function testAIConnection({ provider, baseUrl, apiKey, model }) {
+  async function testAIConnection({
+    provider,
+    baseUrl,
+    apiKey,
+    model,
+    vertexPriority = false,
+    onMeta = null
+  }) {
     const protocol = detectProtocol(provider, baseUrl);
     if (protocol === "anthropic") {
       const cleanBase = normalizeAnthropicBaseUrl(baseUrl);
@@ -1062,7 +1158,11 @@
         payload.generationConfig = { thinkingConfig: { thinkingBudget: 0 } };
       }
 
-      const headers = buildGeminiAuthHeaders(apiKey, true);
+      const useVertexPriority = Boolean(isVertex && provider === "gemini" && vertexPriority);
+      const headers = Object.assign(
+        buildGeminiAuthHeaders(apiKey, true),
+        buildVertexPriorityHeaders(useVertexPriority)
+      );
 
       let { res, endpoint, cachedErrJson } = await postGeminiWithVertexRouting({
         cleanBase,
@@ -1092,6 +1192,10 @@
       }
 
       const data = await res.json();
+      const trafficType = String((data && data.usageMetadata && data.usageMetadata.trafficType) || "");
+      if (typeof onMeta === "function") {
+        onMeta({ trafficType, priorityRequested: useVertexPriority });
+      }
       const parts =
         (data.candidates &&
           data.candidates[0] &&
@@ -1144,8 +1248,11 @@
   global.MarkFlowModules = global.MarkFlowModules || {};
   global.MarkFlowModules.llm = {
     VERTEX_AI_CURATED_MODELS,
+    VERTEX_PRIORITY_OFFICIAL_ORIGINS: Array.from(VERTEX_PRIORITY_OFFICIAL_HOSTS.values()),
     resolveActiveProviderConfig,
     isVertexAiUrl,
+    getVertexPriorityOriginInfo,
+    buildVertexPriorityHeaders,
     detectProtocol,
     normalizeGeminiBaseUrl,
     deriveVertexGlobalBaseFromError,
@@ -1157,6 +1264,7 @@
     testAIConnection,
     extractJsonFromText,
     sanitizeErrorExcerpt,
-    classifyAiError
+    classifyAiError,
+    isAbortError
   };
 })(typeof window !== "undefined" ? window : globalThis);

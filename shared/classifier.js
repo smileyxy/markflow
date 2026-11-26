@@ -21,6 +21,7 @@
   const tree = global.MarkFlowModules.tree;
   const rules = global.MarkFlowModules.rules;
   const sorter = global.MarkFlowModules.sorter;
+  const cleaner = global.MarkFlowModules.cleaner || {};
   const llm = global.MarkFlowModules.llm;
 
   const { DEFAULT_PREFERENCES, MULTI_TOPIC_DOMAINS } = constants;
@@ -222,7 +223,8 @@ ${titleStyleRule}
     lockedFolders = [],
     iconStyle = "emoji",
     aiConfig,
-    preferences = {}
+    preferences = {},
+    signal = null
   }) {
     const activeCfg = resolveActiveProviderConfig(aiConfig);
     if (!activeCfg.enabled || !activeCfg.baseUrl || (!activeCfg.apiKey && activeCfg.provider !== "ollama")) {
@@ -356,9 +358,11 @@ ${fullInventoryLines.join("\n")}
       baseUrl: activeCfg.baseUrl,
       apiKey: activeCfg.apiKey,
       model: activeCfg.model,
+      vertexPriority: activeCfg.provider === "gemini" && Boolean(activeCfg.vertexPriority),
       systemPrompt: blueprintSystemPrompt,
       userPrompt: blueprintUserPrompt,
-      jsonSchema: geminiBlueprintSchema
+      jsonSchema: geminiBlueprintSchema,
+      signal
     });
 
     const rawCategories = Array.isArray(parsed)
@@ -850,7 +854,8 @@ ${fullInventoryLines.join("\n")}
     domainAffinity,
     aiConfig,
     preferences = {},
-    usePangu = true
+    usePangu = true,
+    signal = null
   }) {
     const activeCfg = resolveActiveProviderConfig(aiConfig);
     const { catalogueText, subStyleNote } = buildFolderCataloguePrompt(treeAnalysis);
@@ -915,9 +920,11 @@ ${ctxLines.join("\n")}
       baseUrl: activeCfg.baseUrl,
       apiKey: activeCfg.apiKey,
       model: activeCfg.model,
+      vertexPriority: activeCfg.provider === "gemini" && Boolean(activeCfg.vertexPriority),
       systemPrompt,
       userPrompt,
-      jsonSchema: geminiSchema
+      jsonSchema: geminiSchema,
+      signal
     });
 
     return sanitizeClassificationOutput(rawRes, {
@@ -939,7 +946,8 @@ ${ctxLines.join("\n")}
     targetFolderName = "",
     aiConfig,
     preferences = {},
-    usePangu = true
+    usePangu = true,
+    signal = null
   }) {
     const activeCfg = resolveActiveProviderConfig(aiConfig);
     const pref = Object.assign({}, DEFAULT_PREFERENCES, preferences || {});
@@ -990,9 +998,11 @@ ${ctxLines.join("\n")}
       baseUrl: activeCfg.baseUrl,
       apiKey: activeCfg.apiKey,
       model: activeCfg.model,
+      vertexPriority: activeCfg.provider === "gemini" && Boolean(activeCfg.vertexPriority),
       systemPrompt,
       userPrompt,
-      jsonSchema: geminiTitleSchema
+      jsonSchema: geminiTitleSchema,
+      signal
     });
 
     return finalizeTitle(parsed && parsed.title, localCleanTitle, usePangu, url, targetFolderName);
@@ -1004,7 +1014,8 @@ ${ctxLines.join("\n")}
     treeAnalysis,
     aiConfig,
     preferences = {},
-    usePangu = true
+    usePangu = true,
+    signal = null
   }) {
     const activeCfg = resolveActiveProviderConfig(aiConfig);
     const { catalogueText } = buildFolderCataloguePrompt(treeAnalysis);
@@ -1070,9 +1081,11 @@ ${itemLines.join("\n")}
       baseUrl: activeCfg.baseUrl,
       apiKey: activeCfg.apiKey,
       model: activeCfg.model,
+      vertexPriority: activeCfg.provider === "gemini" && Boolean(activeCfg.vertexPriority),
       systemPrompt,
       userPrompt,
-      jsonSchema: geminiBatchSchema
+      jsonSchema: geminiBatchSchema,
+      signal
     });
 
     const rawList = Array.isArray(parsed)
@@ -1144,6 +1157,20 @@ ${itemLines.join("\n")}
     );
     const aiEnabled = Boolean(activeCfg.enabled && hasCredential);
     const isLocalFree = activeCfg.provider === "ollama";
+
+    if (mode === "dedup" || mode === "deadlinks") {
+      return {
+        totalBookmarks,
+        ruleMatchedCount: 0,
+        aiCount: 0,
+        batchCount: 0,
+        estimatedTokens: 0,
+        isLocalFree: true,
+        aiEnabled: false,
+        providerLabel: activeCfg.providerLabel,
+        model: activeCfg.model
+      };
+    }
 
     if (totalBookmarks === 0) {
       return {
@@ -1231,6 +1258,7 @@ ${itemLines.join("\n")}
     tree,
     rules,
     sorter,
+    cleaner,
     llm,
     {
       platform,

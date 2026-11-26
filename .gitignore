@@ -20,6 +20,7 @@ desktop.ini
 # 非公开草稿与本地笔记
 DESIGN.md
 AGENTS.md
+.agents/
 CLAUDE.md
 GEMINI.md
 *.local.md

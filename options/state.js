@@ -11,7 +11,12 @@
   const DEFAULT_PROVIDERS = Object.fromEntries(
     Object.entries(MarkFlowEngine.PROVIDER_PRESETS).map(([key, p]) => [
       key,
-      { baseUrl: p.baseUrl, apiKey: p.apiKey, model: p.model }
+      {
+        baseUrl: p.baseUrl,
+        apiKey: p.apiKey,
+        model: p.model,
+        vertexPriority: Boolean(p.vertexPriority)
+      }
     ])
   );
 
@@ -22,6 +27,7 @@
       provider: "deepseek",
       providers: {}
     },
+    savedGeminiVertexPriority: false,
     preferences: Object.assign({}, MarkFlowEngine.DEFAULT_PREFERENCES),
     domainMemory: {},
     treeAnalysis: null,
@@ -37,16 +43,24 @@
     customVertexModels: [],
     modelPickerActiveGroup: "ALL",
 
-    // 智能整理与目录重构状态
-    reorgMode: "existing",        // "existing" | "rebuild"
-    activeReorgMode: "existing",  // "existing" | "rebuild" | "sort_only"
+    // 智能整理、目录重构与本地清理工作台状态
+    reorgMode: "existing",        // "existing" | "rebuild" | "dedup" | "deadlinks"
+    activeReorgMode: "existing",  // "existing" | "rebuild" | "sort_only" | "dedup" | "deadlinks"
+    reorgConfigExpanded: true,
+    selectedScopeFolderIds: new Set(),
     lockedL1Ids: new Set(),
     blueprintCategories: [],
     rebuildRawBookmarks: [],
     activeTargetFolders: [],
     previewCategoryFilter: "ALL",
+    previewStatusFilter: "changed", // "changed" | "success" | "failed" | "unprocessed" | "all"
     previewChangedOnly: true,
-    reorgItems: []
+    reorgItems: [],
+    dedupGroups: [],
+    dedupMeta: null,
+    deadlinkResults: [],
+    deadlinkMeta: null,
+    deadlinkFilter: "all"         // "all" | "dead" | "review"
   };
 
   /** 读取当前语言对应的本地化文案，支持 `{key}` 参数插值 */
@@ -111,8 +125,15 @@
         appState.aiConfig.providers[cur].baseUrl = storedAi.baseUrl;
         appState.aiConfig.providers[cur].apiKey = storedAi.apiKey || "";
         if (storedAi.model) appState.aiConfig.providers[cur].model = storedAi.model;
+        if (cur === "gemini" && storedAi.vertexPriority !== undefined) {
+          appState.aiConfig.providers[cur].vertexPriority = Boolean(storedAi.vertexPriority);
+        }
       }
     }
+
+    appState.savedGeminiVertexPriority = Boolean(
+      appState.aiConfig.providers.gemini && appState.aiConfig.providers.gemini.vertexPriority
+    );
 
     parseFolderStructures(tree);
   }

@@ -16,7 +16,11 @@
       model: "deepseek-flash",
       quickModels: ["deepseek-v4-pro", "deepseek-flash"],
       keyPlaceholder: "sk-...",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "https://platform.deepseek.com/api_keys",
+        stepsKey: "ai_guide_deepseek"
+      }
     },
     siliconflow: {
       name: "SiliconFlow",
@@ -31,7 +35,11 @@
         "Qwen/Qwen3.5-9B"
       ],
       keyPlaceholder: "sk-...",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "https://cloud.siliconflow.cn/account/ak",
+        stepsKey: "ai_guide_siliconflow"
+      }
     },
     openrouter: {
       name: "OpenRouter",
@@ -46,13 +54,18 @@
         "openai/gpt-6-luna"
       ],
       keyPlaceholder: "sk-or-v1-...",
-      urlHintKey: "ai_openrouter_url_hint"
+      urlHintKey: "ai_openrouter_url_hint",
+      keyGuide: {
+        url: "https://openrouter.ai/settings/keys",
+        stepsKey: "ai_guide_openrouter"
+      }
     },
     gemini: {
       name: "Google Gemini",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       apiKey: "",
       model: "gemini-3.8-flash",
+      vertexPriority: false,
       quickEndpoints: [
         {
           label: "Gemini API",
@@ -74,7 +87,21 @@
         "gemini-3.5-flash-lite"
       ],
       keyPlaceholder: "AIzaSy... / AQ.... / ya29....",
-      urlHintKey: "ai_gemini_url_hint"
+      urlHintKey: "ai_gemini_url_hint",
+      keyGuide: {
+        default: {
+          url: "https://aistudio.google.com/apikey",
+          stepsKey: "ai_guide_gemini_api"
+        },
+        vertexExpress: {
+          url: "https://console.cloud.google.com/vertex-ai/studio/settings/api-keys",
+          stepsKey: "ai_guide_vertex_express"
+        },
+        vertexProject: {
+          url: "https://console.cloud.google.com/vertex-ai",
+          stepsKey: "ai_guide_vertex_project"
+        }
+      }
     },
     claude: {
       name: "Claude (Anthropic)",
@@ -88,7 +115,11 @@
         "claude-haiku-4-5"
       ],
       keyPlaceholder: "sk-ant-...",
-      urlHintKey: "ai_claude_url_hint"
+      urlHintKey: "ai_claude_url_hint",
+      keyGuide: {
+        url: "https://platform.claude.com/settings/keys",
+        stepsKey: "ai_guide_claude"
+      }
     },
     openai: {
       name: "OpenAI",
@@ -97,7 +128,11 @@
       model: "gpt-6-luna",
       quickModels: ["gpt-6.2-astra", "gpt-6.2-sol", "gpt-6.1-terra", "gpt-6-luna"],
       keyPlaceholder: "sk-...",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "https://platform.openai.com/api-keys",
+        stepsKey: "ai_guide_openai"
+      }
     },
     grok: {
       name: "Grok (xAI)",
@@ -106,7 +141,11 @@
       model: "grok-4.3",
       quickModels: ["grok-4.7", "grok-4.7-fast", "grok-4.3", "grok-3-mini"],
       keyPlaceholder: "xai-...",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "https://console.x.ai/",
+        stepsKey: "ai_guide_grok"
+      }
     },
     ollama: {
       name: "Ollama (Local)",
@@ -115,7 +154,12 @@
       model: "qwen3.5:9b",
       quickModels: ["qwen3.8:27b", "gemma4:12b", "qwen3.5:9b", "qwen3.5:4b"],
       keyPlaceholder: "ollama",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "https://ollama.com/download",
+        linkLabelKey: "ai_btn_get_ollama",
+        stepsKey: "ai_guide_ollama"
+      }
     },
     custom: {
       name: "Custom Endpoint",
@@ -124,7 +168,11 @@
       model: "",
       quickModels: [],
       keyPlaceholder: "sk-... / AIzaSy... / sk-ant-...",
-      urlHintKey: "ai_base_url_hint"
+      urlHintKey: "ai_base_url_hint",
+      keyGuide: {
+        url: "",
+        stepsKey: "ai_guide_custom"
+      }
     }
   };
 

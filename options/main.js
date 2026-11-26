@@ -11,6 +11,8 @@
   const { appState, t, loadState, showToast } = ctx;
 
   function syncStaticTooltips() {
+    const webLink = document.getElementById("linkSidebarWebsite");
+    if (webLink) webLink.title = t("sidebar_website_title");
     const ghLink = document.getElementById("linkSidebarGithub");
     if (ghLink) ghLink.title = t("sidebar_github_title");
   }
@@ -34,6 +36,7 @@
       if (ctx.updateReorgTokenEstimate) ctx.updateReorgTokenEstimate();
       if (ctx.renderRulesTable) ctx.renderRulesTable();
       if (ctx.refreshMemoryCountLabel) ctx.refreshMemoryCountLabel();
+      if (ctx.refreshReorgDynamicI18n) ctx.refreshReorgDynamicI18n();
       if (ctx.syncCustomSelects) ctx.syncCustomSelects();
       showToast(t("lang_switched_toast"));
     });
@@ -81,6 +84,8 @@
     const initialHash = (window.location.hash || "").replace(/^#/, "");
     if (initialHash && document.getElementById(initialHash)) {
       activateTab(initialHash);
+      window.scrollTo(0, 0);
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     }
   }
 

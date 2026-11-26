@@ -15,21 +15,38 @@
         <img src="../icons/icon48.png" alt="MarkFlow" class="brand-logo">
         <div class="brand-info">
           <h1 class="brand-name">MarkFlow</h1>
-          <span class="brand-version">v1.1.0</span>
+          <span class="brand-version">v1.2.0</span>
         </div>
-        <a
-          id="linkSidebarGithub"
-          class="sidebar-github-btn"
-          href="https://github.com/smileyxy/markflow"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="GitHub 开源仓库"
-          aria-label="GitHub"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 0.297C5.37 0.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-          </svg>
-        </a>
+        <div class="sidebar-brand-links">
+          <a
+            id="linkSidebarWebsite"
+            class="sidebar-github-btn"
+            href="https://markflow.smileyxy.dpdns.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="MarkFlow 官方网站"
+            aria-label="Official Website"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </a>
+          <a
+            id="linkSidebarGithub"
+            class="sidebar-github-btn"
+            href="https://github.com/smileyxy/markflow"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="GitHub 开源仓库"
+            aria-label="GitHub"
+          >
+            <svg width="16" height="16" viewBox="-1.25 -1.4 26.5 26.5" fill="currentColor" aria-hidden="true">
+              <path d="M12 0.297C5.37 0.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            </svg>
+          </a>
+        </div>
       </div>
 
       <nav class="nav-menu">
@@ -139,8 +156,31 @@
         </div>
 
         <div class="reorg-stack">
+          <!-- 折叠态顶部摘要条（进入蓝图/预览阶段后自动收起配置卡片） -->
+          <div id="reorgConfigSummaryBar" class="card reorg-summary-bar hidden">
+            <div class="reorg-summary-main">
+              <span id="reorgSummaryModeBadge" class="reorg-summary-badge"></span>
+              <span id="reorgSummaryText" class="reorg-summary-text"></span>
+            </div>
+            <div class="reorg-summary-actions">
+              <button id="btnToggleConfigDrawer" class="btn btn-secondary btn-sm" type="button">
+                <span id="btnToggleConfigDrawerLabel" data-i18n="reorg_btn_edit_config">修改配置</span>
+                <svg class="reorg-summary-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <button id="btnSummaryRerun" class="btn btn-secondary btn-sm" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span id="btnSummaryRerunLabel" data-i18n="btn_reorg_rerun">重新分析</span>
+              </button>
+            </div>
+          </div>
+
           <!-- 卡片 1：整理模式配置与触发 -->
-          <div class="card form-card card-overflow-visible">
+          <div id="reorgConfigCard" class="card form-card card-overflow-visible">
             <div class="form-group">
               <label class="form-label" data-i18n="reorg_mode_label">整理模式</label>
               <div class="reorg-mode-grid">
@@ -149,7 +189,7 @@
                   <div class="mode-card-body">
                     <div class="mode-card-title">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                      <span data-i18n="reorg_mode_existing">归入现有目录 & 内部排序</span>
+                      <span data-i18n="reorg_mode_existing">归入现有目录 &amp; 内部排序</span>
                     </div>
                     <p class="mode-card-desc" data-i18n="reorg_mode_existing_desc">保留现有目录框架，归位书签、精简标题，并按功能与站点优先级重排目录内顺序</p>
                   </div>
@@ -165,32 +205,67 @@
                     <p class="mode-card-desc" data-i18n="reorg_mode_rebuild_desc">连同一级与二级目录自底向上重新设计，先审阅蓝图，再统一归位、排序并清理旧空目录</p>
                   </div>
                 </label>
+
+                <label class="reorg-mode-card" id="modeCardDedup">
+                  <input type="radio" name="reorgMode" value="dedup" id="radioModeDedup">
+                  <div class="mode-card-body">
+                    <div class="mode-card-title">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                      <span data-i18n="reorg_mode_dedup">重复书签合并</span>
+                      <span class="mode-zero-token-pill" data-i18n="reorg_zero_token_tag">0 Token</span>
+                    </div>
+                    <p class="mode-card-desc" data-i18n="reorg_mode_dedup_desc">纯本地规范化 URL（忽略协议/末尾斜杠与追踪参数），智能保留最优副本并安全清理重复项</p>
+                  </div>
+                </label>
+
+                <label class="reorg-mode-card" id="modeCardDeadlinks">
+                  <input type="radio" name="reorgMode" value="deadlinks" id="radioModeDeadlinks">
+                  <div class="mode-card-body">
+                    <div class="mode-card-title">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>
+                      <span data-i18n="reorg_mode_deadlinks">失效链接清理</span>
+                      <span class="mode-zero-token-pill" data-i18n="reorg_zero_token_tag">0 Token</span>
+                    </div>
+                    <p class="mode-card-desc" data-i18n="reorg_mode_deadlinks_desc">按需临时授权探测 404/410 与死域名，随时可取消，区分高置信失效与需人工复核后一键清理</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 通用范围选择（S1：分段开关 + 同行嵌合下拉） -->
+            <div id="reorgSharedScopePanel" class="reorg-scope-block">
+              <label class="form-label" data-i18n="reorg_scope_label">整理范围</label>
+              <div class="scope-inline-row">
+                <div class="scope-segmented" role="radiogroup">
+                  <label class="scope-seg-item is-active" id="lblScopeAll">
+                    <input type="radio" name="reorgScope" value="all" checked id="radioScopeAll">
+                    <span data-i18n="reorg_scope_all">全量书签库（所有书签）</span>
+                  </label>
+                  <label class="scope-seg-item" id="lblScopeFolder">
+                    <input type="radio" name="reorgScope" value="folder" id="radioScopeFolder">
+                    <span data-i18n="reorg_scope_select">指定特定文件夹</span>
+                  </label>
+                </div>
+                <div id="reorgFolderSelectGroup" class="scope-folder-inline hidden">
+                  <div id="scopeFoldersDropdown" class="csel-wrapper csel-form scope-msel-wrap">
+                    <button id="btnScopeFoldersTrigger" type="button" class="csel-trigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span id="scopeFoldersSummary" class="csel-label"></span>
+                      <svg class="csel-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="scopeFoldersMenu" class="csel-menu scope-msel-menu hidden" role="listbox" aria-multiselectable="true">
+                      <div class="locked-msel-header">
+                        <span class="locked-msel-hint" data-i18n="reorg_scope_menu_hint">可多选文件夹，勾选父目录将自动包含子目录</span>
+                        <button id="btnScopeClearAll" type="button" class="locked-msel-clear" data-i18n="reorg_locked_clear">清空</button>
+                      </div>
+                      <div id="scopeFoldersList" class="scope-msel-tree"></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- 归入现有目录选项 -->
             <div id="existingModeOptions" class="existing-mode-stack">
-              <div class="reorg-scope-panel">
-                <div class="form-group" style="flex: 1;">
-                  <label class="form-label" data-i18n="reorg_scope_label">整理范围</label>
-                  <div class="scope-radio-group">
-                    <label class="scope-radio-label">
-                      <input type="radio" name="reorgScope" value="all" checked id="radioScopeAll">
-                      <span data-i18n="reorg_scope_all">全量书签库（所有书签）</span>
-                    </label>
-                    <label class="scope-radio-label">
-                      <input type="radio" name="reorgScope" value="folder" id="radioScopeFolder">
-                      <span data-i18n="reorg_scope_select">指定特定文件夹</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div class="form-group hidden" id="reorgFolderSelectGroup" style="flex: 1;">
-                  <label class="form-label" data-i18n="reorg_target_folder_label">选择要整理的目标文件夹</label>
-                  <select id="selReorgFolder" class="form-select font-mono" data-custom-select="form"></select>
-                </div>
-              </div>
-
               <div class="sort-option-bar">
                 <div class="sort-option-main">
                   <label class="sort-checkbox-label">
@@ -219,42 +294,108 @@
               </div>
             </div>
 
-            <!-- 全盘重构目录选项 -->
+            <!-- 全盘重构目录选项（L1：视觉风格与锁定目录并排两列） -->
             <div id="rebuildModeOptions" class="rebuild-options-panel hidden">
-              <div class="form-group" style="max-width: 460px;">
-                <label class="form-label" data-i18n="reorg_icon_style_label">新一级目录视觉风格</label>
-                <select id="selRebuildIconStyle" class="form-select" data-custom-select="form">
-                  <option value="emoji" data-i18n="reorg_icon_emoji">语义图标前缀风（一级带图标，二级纯文字）</option>
-                  <option value="emoji_both" data-i18n="reorg_icon_emoji_both">双层图标风（一级与二级目录均带图标）</option>
-                  <option value="plain" data-i18n="reorg_icon_plain">纯文字清爽风（一级与二级目录均不带图标）</option>
-                  <option value="numbered" data-i18n="reorg_icon_numbered">数字序号索引风（01 工作 · 02 技术）</option>
-                  <option value="symbol" data-i18n="reorg_icon_symbol">极简几何符号风（◆ 工作 · ◆ 技术）</option>
-                </select>
-              </div>
+              <div class="rebuild-top-row">
+                <div class="form-group">
+                  <label class="form-label" data-i18n="reorg_icon_style_label">新一级目录视觉风格</label>
+                  <select id="selRebuildIconStyle" class="form-select" data-custom-select="form">
+                    <option value="emoji" data-i18n="reorg_icon_emoji">语义图标前缀风（一级带图标，二级纯文字）</option>
+                    <option value="emoji_both" data-i18n="reorg_icon_emoji_both">双层图标风（一级与二级目录均带图标）</option>
+                    <option value="plain" data-i18n="reorg_icon_plain">纯文字清爽风（一级与二级目录均不带图标）</option>
+                    <option value="numbered" data-i18n="reorg_icon_numbered">数字序号索引风（01 工作 · 02 技术）</option>
+                    <option value="symbol" data-i18n="reorg_icon_symbol">极简几何符号风（◆ 工作 · ◆ 技术）</option>
+                  </select>
+                </div>
 
-              <div class="form-group" id="lockedFoldersGroup">
-                <label class="form-label" data-i18n="reorg_locked_label">锁定保留的现有一级目录（可选，勾选后保持原样不参与打散）</label>
-                <div id="lockedFoldersList" class="locked-folders-list"></div>
+                <div class="form-group" id="lockedFoldersGroup">
+                  <label class="form-label" data-i18n="reorg_locked_label">锁定保留现有一级目录（可选）</label>
+                  <div id="lockedFoldersDropdown" class="csel-wrapper csel-form locked-msel-wrap">
+                    <button id="btnLockedFoldersTrigger" type="button" class="csel-trigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span id="lockedFoldersSummary" class="csel-label"></span>
+                      <svg class="csel-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="lockedFoldersMenu" class="csel-menu locked-msel-menu hidden" role="listbox" aria-multiselectable="true">
+                      <div class="locked-msel-header">
+                        <span class="locked-msel-hint" data-i18n="reorg_locked_menu_hint">勾选保持原样不参与打散</span>
+                        <button id="btnLockedClearAll" type="button" class="locked-msel-clear" data-i18n="reorg_locked_clear">清空</button>
+                      </div>
+                      <div id="lockedFoldersList" class="locked-msel-grid"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 重复书签合并选项 -->
+            <div id="dedupModeOptions" class="cleaner-options-panel hidden">
+              <div class="sort-option-bar">
+                <div class="sort-option-main">
+                  <label class="sort-checkbox-label">
+                    <input type="checkbox" id="chkDedupStripTracking" checked>
+                    <span data-i18n="reorg_dedup_strip_tracking">忽略追踪参数（utm_* / spm / fbclid / vd_source 等）</span>
+                  </label>
+                  <label class="sort-checkbox-label">
+                    <input type="checkbox" id="chkDedupIgnoreHash">
+                    <span data-i18n="reorg_dedup_ignore_hash">忽略 #锚点（适合合并同页不同段落链接）</span>
+                  </label>
+                </div>
+                <div class="sort-rule-inline">
+                  <label for="selDedupStrategy" class="sort-rule-label" data-i18n="reorg_dedup_strategy_label">保留策略：</label>
+                  <select id="selDedupStrategy" class="form-select" data-custom-select="form">
+                    <option value="smart" data-i18n="reorg_dedup_strategy_smart">智能推荐（深层已归类 → 清晰标题 → 最早）</option>
+                    <option value="oldest" data-i18n="reorg_dedup_strategy_oldest">保留最早收藏副本</option>
+                    <option value="newest" data-i18n="reorg_dedup_strategy_newest">保留最新收藏副本</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 失效链接清理选项 -->
+            <div id="deadlinkModeOptions" class="cleaner-options-panel hidden">
+              <div class="sort-option-bar">
+                <div class="sort-option-main">
+                  <label class="sort-checkbox-label">
+                    <input type="checkbox" id="chkDeadlinkSkipLocal" checked>
+                    <span data-i18n="reorg_dead_skip_local">跳过局域网 / 本地服务及非 HTTP(S) 书签（推荐）</span>
+                  </label>
+                </div>
+                <span class="deadlink-perm-hint" data-i18n="reorg_dead_perm_note">点击检测时按需临时授权网页访问，完成或取消后自动撤销（拒绝则仅测连通性）</span>
               </div>
             </div>
 
             <div class="reorg-trigger-bar">
-              <div id="reorgTokenEstimate" class="token-estimate-pill"></div>
-              <button id="btnStartReorganize" class="btn btn-primary" type="button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              <div id="reorgTokenEstimate" class="token-estimate-pill is-empty">
+                <span class="token-est-dot" aria-hidden="true"></span>
+                <span id="reorgTokenEstimateText"></span>
+              </div>
+              <button id="btnStartReorganize" class="btn btn-ink reorg-action-btn" type="button">
                 <span id="btnStartReorgLabel" data-i18n="btn_start_reorg">开始智能归类与排序</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
               </button>
             </div>
+          </div>
 
-            <!-- 执行进度条 -->
-            <div id="reorgProgressContainer" class="reorg-progress-box hidden">
-              <div class="reorg-progress-header">
+          <!-- 独立实时执行进度卡片（支持蓝图/预览折叠状态下显示，带随时取消按钮） -->
+          <div id="reorgProgressContainer" class="card reorg-progress-box hidden">
+            <div class="reorg-progress-header">
+              <div class="reorg-progress-meta">
                 <span id="reorgProgressText">...</span>
-                <span id="reorgProgressPercent" class="font-mono">0%</span>
+                <span id="reorgProgressSub" class="reorg-progress-sub" data-i18n="reorg_prog_cancel_hint">每批完成后自动暂存进度；随时可安全取消</span>
               </div>
-              <div class="reorg-progress-bar-bg">
-                <div id="reorgProgressBar" class="reorg-progress-bar-fill"></div>
+              <div class="reorg-progress-actions">
+                <span id="reorgProgressPercent" class="font-mono reorg-progress-pct">0%</span>
+                <button id="btnCancelReorg" class="btn btn-sm reorg-cancel-btn" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <rect x="9" y="9" width="6" height="6"></rect>
+                  </svg>
+                  <span id="btnCancelReorgLabel" data-i18n="reorg_btn_cancel">取消整理</span>
+                </button>
               </div>
+            </div>
+            <div class="reorg-progress-bar-bg">
+              <div id="reorgProgressBar" class="reorg-progress-bar-fill"></div>
             </div>
           </div>
 
@@ -274,7 +415,7 @@
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                   <span data-i18n="btn_regen_bp">重新生成蓝图</span>
                 </button>
-                <button id="btnConfirmBlueprint" class="btn btn-primary" type="button">
+                <button id="btnConfirmBlueprint" class="btn btn-ink reorg-action-btn" type="button">
                   <span data-i18n="btn_confirm_bp">第二步：确认蓝图并映射书签 →</span>
                 </button>
               </div>
@@ -283,57 +424,111 @@
             <div id="blueprintCardsGrid" class="blueprint-cards-grid"></div>
           </div>
 
-          <!-- 卡片 3：整理预览与微调（独立毛玻璃卡片 + 翡翠绿唯一确认主按钮） -->
-          <div id="reorgPreviewContainer" class="card form-card hidden">
-            <div class="pane-header" style="margin-bottom: 4px;">
+          <!-- 卡片 3：统一工作台预览区（支持 AI 整理 / 重复合并 / 失效清理三种视图） -->
+          <div id="reorgPreviewContainer" class="card form-card card-overflow-visible hidden">
+            <div class="reorg-preview-header">
               <div>
-                <h3 class="section-card-title" data-i18n="reorg_preview_title">整理预览与微调</h3>
-                <p class="form-hint" data-i18n="reorg_backup_tip">应用前会自动下载一份带时间戳的标准 HTML 安全备份文件，确保数据安全。</p>
+                <h3 id="reorgPreviewTitle" class="section-card-title" data-i18n="reorg_preview_title">整理预览与微调</h3>
+                <p id="reorgPreviewSubtitle" class="form-hint" data-i18n="reorg_backup_tip">应用前会自动下载一份带时间戳的标准 HTML 安全备份文件，确保数据安全。</p>
               </div>
-              <button id="btnApplyReorganize" class="btn btn-emerald" type="button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span data-i18n="btn_apply_reorg">确认并应用新书签结构</span>
+              <button id="btnApplyReorganize" class="btn btn-emerald reorg-action-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span id="btnApplyReorgLabel" data-i18n="btn_apply_reorg">确认并应用新书签结构</span>
               </button>
             </div>
 
-            <div class="reorg-kpi-row">
-              <div class="kpi-card">
-                <div id="kpiTotalCount" class="kpi-val">0</div>
-                <div class="kpi-lbl" data-i18n="reorg_kpi_total">本次处理书签</div>
+            <!-- 统一紧凑状态与筛选栏 -->
+            <div id="reorgCompactStatsStrip" class="reorg-status-strip">
+              <!-- AI / 排序状态筛选组 -->
+              <div id="reorgAiStatusGroup" class="reorg-status-group">
+                <div class="reorg-status-tabs">
+                  <button id="btnFilterChanged" type="button" class="status-filter-pill active" data-status="changed">
+                    <span data-i18n="reorg_tab_changed">全部变动</span>
+                    <span id="cntFilterChanged" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnFilterSuccess" type="button" class="status-filter-pill" data-status="success">
+                    <span data-i18n="reorg_tab_success">已整理</span>
+                    <span id="cntFilterSuccess" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnFilterFailed" type="button" class="status-filter-pill is-danger hidden" data-status="failed">
+                    <span data-i18n="reorg_tab_failed">AI 失败</span>
+                    <span id="cntFilterFailed" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnFilterUnprocessed" type="button" class="status-filter-pill is-warning hidden" data-status="unprocessed">
+                    <span data-i18n="reorg_tab_unprocessed">未处理</span>
+                    <span id="cntFilterUnprocessed" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnFilterAll" type="button" class="status-filter-pill" data-status="all">
+                    <span data-i18n="reorg_tab_all">全部</span>
+                    <span id="cntFilterAll" class="stat-pill-count">0</span>
+                  </button>
+                  <span id="reorgFolderCountMeta" class="reorg-meta-note"></span>
+                </div>
+
+                <div class="reorg-status-actions">
+                  <div id="reorgBatchErrorBanner" class="reorg-inline-alert hidden" role="alert">
+                    <span id="reorgBatchErrorText" class="reorg-inline-alert-text"></span>
+                    <button id="btnRetryFailedReorg" class="btn btn-sm reorg-retry-btn" type="button"></button>
+                  </div>
+                  <div id="reorgCanceledBanner" class="reorg-inline-alert is-warning hidden">
+                    <button id="btnResumeUnprocessed" class="btn btn-sm reorg-resume-btn" type="button"></button>
+                  </div>
+                  <div class="reorg-folder-filter-wrap">
+                    <select id="selReorgCategoryFilter" class="form-select" data-custom-select="form"></select>
+                  </div>
+                </div>
               </div>
-              <div class="kpi-card">
-                <div id="kpiChangedCount" class="kpi-val kpi-accent">0</div>
-                <div class="kpi-lbl" data-i18n="reorg_kpi_moved">归位与精简标题</div>
+
+              <!-- 重复合并状态组 -->
+              <div id="reorgDedupStatusGroup" class="reorg-status-group hidden">
+                <div class="reorg-status-tabs">
+                  <span id="dedupStatGroups" class="reorg-summary-badge"></span>
+                  <span id="dedupStatKeep" class="reorg-stat-chip is-success"></span>
+                  <span id="dedupStatRemove" class="reorg-stat-chip is-danger"></span>
+                  <span class="reorg-meta-note" data-i18n="reorg_dedup_hint">点击单选可切换保留项，仅删除选中的多余副本</span>
+                </div>
+                <div class="reorg-status-actions">
+                  <button id="btnResetDedupSelection" class="btn btn-secondary btn-sm" type="button" data-i18n="reorg_dedup_btn_reset">恢复默认推荐</button>
+                </div>
               </div>
-              <div class="kpi-card">
-                <div id="kpiFolderCount" class="kpi-val kpi-success">0</div>
-                <div class="kpi-lbl" data-i18n="reorg_kpi_folders">涉及目标目录</div>
+
+              <!-- 失效链接状态组 -->
+              <div id="reorgDeadlinkStatusGroup" class="reorg-status-group hidden">
+                <div class="reorg-status-tabs">
+                  <button id="btnDeadFilterAll" type="button" class="status-filter-pill active" data-dead-filter="all">
+                    <span data-i18n="reorg_dead_tab_all">全部异常</span>
+                    <span id="cntDeadAll" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnDeadFilterDead" type="button" class="status-filter-pill is-danger" data-dead-filter="dead">
+                    <span data-i18n="reorg_dead_tab_dead">高置信失效</span>
+                    <span id="cntDeadHigh" class="stat-pill-count">0</span>
+                  </button>
+                  <button id="btnDeadFilterReview" type="button" class="status-filter-pill is-warning" data-dead-filter="review">
+                    <span data-i18n="reorg_dead_tab_review">需人工复核</span>
+                    <span id="cntDeadReview" class="stat-pill-count">0</span>
+                  </button>
+                  <span id="deadlinkMetaNote" class="reorg-meta-note"></span>
+                  <span id="deadlinkModeBadge" class="reorg-mode-pill hidden"></span>
+                </div>
+                <div class="reorg-status-actions">
+                  <button id="btnDeadSelectHigh" class="btn btn-secondary btn-sm" type="button" data-i18n="reorg_dead_btn_select_high">仅选高置信</button>
+                  <button id="btnDeadClearAll" class="btn btn-secondary btn-sm" type="button" data-i18n="reorg_dead_btn_clear">清空勾选</button>
+                </div>
               </div>
             </div>
 
-            <div id="reorgBatchErrorBanner" class="reorg-error-banner hidden" role="alert">
-              <div class="reorg-error-banner-main">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <span id="reorgBatchErrorText"></span>
-              </div>
-              <button id="btnRetryFailedReorg" class="btn btn-sm reorg-retry-btn" type="button"></button>
+            <!-- 失效链接代理/网络异常提醒条（仅书签内生信号命中时显示） -->
+            <div id="deadlinkProxyHintBanner" class="deadlink-proxy-banner hidden" role="status">
+              <svg class="deadlink-proxy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <span id="deadlinkProxyHintText" class="deadlink-proxy-text"></span>
             </div>
 
-            <div class="reorg-preview-toolbar">
-              <label class="sort-checkbox-label">
-                <input type="checkbox" id="chkPreviewChangedOnly" checked>
-                <span data-i18n="reorg_changed_only_label">仅显示并调整有变动项</span>
-              </label>
-              <span id="reorgUnchangedHint" class="text-muted" style="font-size: 12px;"></span>
-            </div>
-
-            <div id="reorgCategoryStatsBar" class="reorg-stats-bar"></div>
-
-            <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+            <!-- 视图 A：AI 归类 / 重排预览表 -->
+            <div id="reorgAiTableWrap" class="table-container reorg-table-scroll">
               <table class="rules-table reorg-preview-table">
                 <thead>
                   <tr>
@@ -346,6 +541,39 @@
                 </thead>
                 <tbody id="reorgPreviewTableBody"></tbody>
               </table>
+            </div>
+
+            <!-- 视图 B：重复书签分组列表 -->
+            <div id="reorgDedupListWrap" class="reorg-dedup-list hidden"></div>
+
+            <!-- 视图 C：失效链接排查表 -->
+            <div id="reorgDeadlinkTableWrap" class="table-container reorg-table-scroll hidden">
+              <table class="rules-table reorg-deadlink-table">
+                <thead>
+                  <tr>
+                    <th style="width: 44px; text-align: center;">
+                      <input type="checkbox" id="chkDeadSelectVisible" aria-label="Select visible">
+                    </th>
+                    <th style="width: 36%;" data-i18n="th_dead_bookmark">书签名称 / 链接</th>
+                    <th style="width: 14%;" data-i18n="th_dead_folder">所在目录</th>
+                    <th style="width: 38%;" data-i18n="th_dead_status">状态分类 / 诊断</th>
+                    <th style="width: 60px; text-align: right;" data-i18n="th_dead_verify">核验</th>
+                  </tr>
+                </thead>
+                <tbody id="reorgDeadlinkTableBody"></tbody>
+              </table>
+            </div>
+
+            <!-- 零异常干净状态占位 -->
+            <div id="reorgCleanEmptyState" class="reorg-clean-empty hidden">
+              <div class="reorg-clean-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <div id="reorgCleanEmptyTitle" class="reorg-clean-title"></div>
+              <div id="reorgCleanEmptyDesc" class="reorg-clean-desc"></div>
             </div>
           </div>
         </div>
@@ -367,7 +595,7 @@
           </div>
         </div>
 
-        <div class="card form-card">
+        <div class="card form-card card-overflow-visible">
           <div class="form-group">
             <label class="form-label" data-i18n="ai_preset_label">推荐服务商预设（各服务商独立持久化保存）</label>
             <div class="provider-grid" id="providerPresetGrid">
@@ -417,11 +645,42 @@
             <div id="endpointQuickChipsContainer" class="quick-models-bar hidden">
               <span class="quick-models-label" data-i18n="ai_quick_endpoints_label">接口模式：</span>
               <div id="endpointQuickChips" class="quick-models-list"></div>
+              <div id="vertexPriorityRow" class="vertex-priority-pill-group hidden">
+                <label id="vertexPriorityPill" class="vertex-priority-pill" for="chkVertexPriority">
+                  <input type="checkbox" id="chkVertexPriority" class="vertex-priority-input">
+                  <svg class="vertex-priority-bolt" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  <span data-i18n="ai_vertex_priority_pill">Priority 优先</span>
+                  <span class="vertex-priority-dot" aria-hidden="true"></span>
+                </label>
+                <div id="vertexPriorityTipWrap" class="inline-info-tip">
+                  <button
+                    id="btnVertexPriorityTip"
+                    class="inline-info-btn"
+                    type="button"
+                    aria-label="Priority Info"
+                    aria-expanded="false"
+                  >?</button>
+                  <div class="inline-info-popover" role="tooltip" data-i18n="ai_vertex_priority_desc">默认关闭。开启后附带 Priority 请求头以降低延迟与 429 限流（Google 将按更高费率计费）；首次开启需按需授权当前官方 Vertex AI 域名。</div>
+                </div>
+              </div>
             </div>
+            <span id="vertexPriorityActiveHint" class="vertex-priority-active-hint hidden" data-i18n="ai_vertex_priority_active">已启用 · 将按 Google 更高费率计费，并按需授权当前官方 Vertex AI 域名</span>
           </div>
 
           <div class="form-group">
-            <label for="inputApiKey" class="form-label" data-i18n="ai_key_label">API 密钥 (API Key)</label>
+            <div class="label-action-row">
+              <label for="inputApiKey" class="form-label" data-i18n="ai_key_label">API 密钥 (API Key)</label>
+              <button id="btnToggleKeyGuide" class="key-guide-trigger" type="button" aria-haspopup="dialog" aria-controls="apiKeyGuidePanel">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span id="btnToggleKeyGuideText" data-i18n="ai_btn_get_key">获取 API Key</span>
+              </button>
+            </div>
             <div class="input-password-wrapper">
               <input type="password" id="inputApiKey" class="form-input font-mono" placeholder="sk-...">
               <button id="btnToggleApiKey" class="toggle-pwd-btn" type="button" title="Toggle Visibility">
@@ -775,12 +1034,26 @@
                   <h3 class="about-title">MarkFlow AI</h3>
                   <span class="about-license-pill" data-i18n="about_license_badge">GNU GPL-3.0 开源</span>
                   <a
+                    id="linkAboutWebsite"
+                    class="about-github-link"
+                    href="https://markflow.smileyxy.dpdns.org/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <span data-i18n="about_website_btn">官方网站</span>
+                  </a>
+                  <a
                     class="about-github-link"
                     href="https://github.com/smileyxy/markflow"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="-1.25 -1.4 26.5 26.5" fill="currentColor" aria-hidden="true">
                       <path d="M12 0.297C5.37 0.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
                     </svg>
                     <span data-i18n="about_github_btn">GitHub 仓库</span>
@@ -887,7 +1160,17 @@
                 <li data-i18n="privacy_p3">最小化按需授权：仅在您主动按下快捷键唤醒插件时读取当前标签页信息，并可随时一键关闭正文摘要提取。</li>
                 <li data-i18n="privacy_p4">原生兼容多端同步：所有书签直接写入浏览器原生书签树，无缝触发浏览器云端同步。</li>
               </ul>
-              <p class="about-license-note" data-i18n="about_sponsor_note">MarkFlow 基于 GNU GPL-3.0 协议开源，坚持零服务器运营与永久无广告。</p>
+              <div class="privacy-footer-row">
+                <p class="about-license-note" data-i18n="about_sponsor_note">MarkFlow 基于 GNU GPL-3.0 协议开源，坚持零服务器运营与永久无广告。</p>
+                <a
+                  id="linkPrivacyPolicy"
+                  class="privacy-policy-link"
+                  href="https://markflow.smileyxy.dpdns.org/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="about_privacy_policy_link"
+                >在线隐私政策 ↗</a>
+              </div>
             </div>
           </div>
         </div>
@@ -978,6 +1261,35 @@
     </div>
   </div>
 
+  <!-- API Key 获取指引轻量弹窗 -->
+  <div id="apiKeyGuidePanel" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="apiKeyGuideTitle">
+    <div class="modal-card key-guide-modal-card">
+      <div class="modal-header">
+        <h3 id="apiKeyGuideTitle">3 步快速配置</h3>
+        <button id="btnCloseKeyGuide" class="modal-close-btn" type="button" title="Close" aria-label="Close">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body key-guide-modal-body">
+        <div id="apiKeyGuideSteps" class="key-guide-list" role="list"></div>
+      </div>
+      <div class="modal-footer key-guide-modal-footer">
+        <p class="key-guide-note" data-i18n="ai_guide_byok_note">官方控制台将在新标签页打开；账号注册与 API 用量计费均由对应服务商直接提供，MarkFlow 不参与且不经手任何密钥。</p>
+        <a id="linkGuidePortal" class="btn btn-primary key-guide-portal-btn" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer">
+          <span id="linkGuidePortalText" data-i18n="ai_btn_get_key">获取 API Key</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- 接口可用模型双栏选择弹窗 -->
   <div id="modelPickerModal" class="modal-overlay hidden">
     <div class="modal-card model-picker-modal-card">
@@ -1036,6 +1348,7 @@
   <script src="../shared/tree.js"></script>
   <script src="../shared/rules.js"></script>
   <script src="../shared/sorter.js"></script>
+  <script src="../shared/cleaner.js"></script>
   <script src="../shared/llm.js"></script>
   <script src="../shared/classifier.js"></script>
 

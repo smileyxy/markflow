@@ -11,12 +11,90 @@
   const { DEFAULT_PROVIDERS, appState, t, showToast, formatFriendlyAiError } = ctx;
   const { escapeHtml } = MarkFlowEngine;
 
+  function hasPermissionsApi() {
+    return typeof chrome !== "undefined" && chrome.permissions;
+  }
+
+  async function hasOptionalOriginPermission(originPattern) {
+    if (!originPattern || !hasPermissionsApi() || typeof chrome.permissions.contains !== "function") {
+      return true;
+    }
+    try {
+      return await chrome.permissions.contains({ origins: [originPattern] });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function requestOptionalOriginPermission(originPattern) {
+    if (!originPattern || !hasPermissionsApi() || typeof chrome.permissions.request !== "function") {
+      return true;
+    }
+    try {
+      return await chrome.permissions.request({ origins: [originPattern] });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function revokeAllVertexPriorityPermissions() {
+    if (!hasPermissionsApi() || typeof chrome.permissions.remove !== "function") return;
+    const origins = Array.isArray(MarkFlowEngine.VERTEX_PRIORITY_OFFICIAL_ORIGINS)
+      ? MarkFlowEngine.VERTEX_PRIORITY_OFFICIAL_ORIGINS
+      : [];
+    if (origins.length === 0) return;
+    try {
+      const granted = [];
+      for (const origin of origins) {
+        if (await hasOptionalOriginPermission(origin)) {
+          granted.push(origin);
+        }
+      }
+      if (granted.length > 0) {
+        await chrome.permissions.remove({ origins: granted });
+      }
+    } catch (e) {}
+  }
+
+  async function ensureVertexPriorityPermissionForUrl(baseUrl) {
+    const info = MarkFlowEngine.getVertexPriorityOriginInfo(baseUrl);
+    if (!info.supported) {
+      showToast(t("ai_toast_vertex_priority_region"), true);
+      return false;
+    }
+    if (info.isOfficialGoogle && info.originPattern) {
+      const already = await hasOptionalOriginPermission(info.originPattern);
+      if (!already) {
+        const granted = await requestOptionalOriginPermission(info.originPattern);
+        if (!granted) {
+          showToast(t("ai_toast_vertex_priority_denied"), true);
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   function initAiTab() {
     const chkAiEnabled = document.getElementById("chkAiEnabled");
     const inputBaseUrl = document.getElementById("inputBaseUrl");
     const inputApiKey = document.getElementById("inputApiKey");
     const inputModel = document.getElementById("inputModel");
+    const chkVertexPriority = document.getElementById("chkVertexPriority");
+    const btnToggleKeyGuide = document.getElementById("btnToggleKeyGuide");
+    const btnCloseKeyGuide = document.getElementById("btnCloseKeyGuide");
+    const apiKeyGuidePanel = document.getElementById("apiKeyGuidePanel");
+    const btnVertexPriorityTip = document.getElementById("btnVertexPriorityTip");
+    const vertexPriorityTipWrap = document.getElementById("vertexPriorityTipWrap");
     const presetBtns = document.querySelectorAll(".preset-btn");
+
+    const setPriorityTipOpen = open => {
+      if (!vertexPriorityTipWrap) return;
+      vertexPriorityTipWrap.classList.toggle("is-open", Boolean(open));
+      if (btnVertexPriorityTip) {
+        btnVertexPriorityTip.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+    };
 
     chkAiEnabled.checked = !!appState.aiConfig.enabled;
 
@@ -27,8 +105,95 @@
     inputBaseUrl.value = activeConfig.baseUrl || "";
     inputApiKey.value = activeConfig.apiKey || "";
     inputModel.value = activeConfig.model || "";
+    if (chkVertexPriority) {
+      chkVertexPriority.checked = Boolean(
+        appState.aiConfig.providers.gemini && appState.aiConfig.providers.gemini.vertexPriority
+      );
+      if (currentProvider === "gemini" && chkVertexPriority.checked) {
+        const info = MarkFlowEngine.getVertexPriorityOriginInfo(inputBaseUrl.value.trim());
+        if (!info.supported) {
+          chkVertexPriority.checked = false;
+          appState.aiConfig.providers.gemini.vertexPriority = false;
+        } else if (info.isOfficialGoogle && info.originPattern) {
+          hasOptionalOriginPermission(info.originPattern).then(granted => {
+            if (!granted) {
+              chkVertexPriority.checked = false;
+              if (appState.aiConfig.providers.gemini) {
+                appState.aiConfig.providers.gemini.vertexPriority = false;
+              }
+              syncVertexPriorityActiveHint();
+            }
+          });
+        }
+      }
+    }
 
     updateProviderUiMeta(currentProvider);
+    syncVertexPriorityActiveHint();
+
+    if (btnToggleKeyGuide && apiKeyGuidePanel) {
+      btnToggleKeyGuide.addEventListener("click", () => {
+        setPriorityTipOpen(false);
+        setKeyGuideOpen(true);
+      });
+    }
+
+    if (btnCloseKeyGuide) {
+      btnCloseKeyGuide.addEventListener("click", () => setKeyGuideOpen(false));
+    }
+
+    if (apiKeyGuidePanel) {
+      apiKeyGuidePanel.addEventListener("click", e => {
+        if (e.target === apiKeyGuidePanel) {
+          setKeyGuideOpen(false);
+        }
+      });
+    }
+
+    if (btnVertexPriorityTip && vertexPriorityTipWrap) {
+      btnVertexPriorityTip.addEventListener("click", e => {
+        e.stopPropagation();
+        const nextOpen = !vertexPriorityTipWrap.classList.contains("is-open");
+        setPriorityTipOpen(nextOpen);
+      });
+    }
+
+    document.addEventListener("click", e => {
+      if (vertexPriorityTipWrap && !vertexPriorityTipWrap.contains(e.target)) {
+        setPriorityTipOpen(false);
+      }
+    });
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        setKeyGuideOpen(false);
+        setPriorityTipOpen(false);
+      }
+    });
+
+    if (chkVertexPriority) {
+      chkVertexPriority.addEventListener("change", async () => {
+        if (!appState.aiConfig.providers.gemini) {
+          appState.aiConfig.providers.gemini = Object.assign({}, DEFAULT_PROVIDERS.gemini);
+        }
+        if (chkVertexPriority.checked) {
+          const ok = await ensureVertexPriorityPermissionForUrl(inputBaseUrl.value.trim());
+          if (!ok) {
+            chkVertexPriority.checked = false;
+            appState.aiConfig.providers.gemini.vertexPriority = false;
+            syncVertexPriorityActiveHint();
+            return;
+          }
+          appState.aiConfig.providers.gemini.vertexPriority = true;
+        } else {
+          appState.aiConfig.providers.gemini.vertexPriority = false;
+          if (!appState.savedGeminiVertexPriority) {
+            await revokeAllVertexPriorityPermissions();
+          }
+        }
+        syncVertexPriorityActiveHint();
+      });
+    }
 
     presetBtns.forEach(btn => {
       btn.classList.toggle("active", btn.getAttribute("data-provider") === currentProvider);
@@ -42,6 +207,11 @@
           appState.aiConfig.providers[prevProvider].baseUrl = inputBaseUrl.value.trim();
           appState.aiConfig.providers[prevProvider].apiKey = inputApiKey.value.trim();
           appState.aiConfig.providers[prevProvider].model = inputModel.value.trim();
+          if (prevProvider === "gemini" && chkVertexPriority) {
+            appState.aiConfig.providers[prevProvider].vertexPriority = Boolean(
+              chkVertexPriority.checked
+            );
+          }
         }
 
         appState.aiConfig.provider = targetProvider;
@@ -53,13 +223,23 @@
         inputBaseUrl.value = nextCfg.baseUrl || "";
         inputApiKey.value = nextCfg.apiKey || "";
         inputModel.value = nextCfg.model || "";
+        if (chkVertexPriority && targetProvider === "gemini") {
+          chkVertexPriority.checked = Boolean(nextCfg.vertexPriority);
+        }
 
+        setKeyGuideOpen(false);
+        setPriorityTipOpen(false);
         document.getElementById("modelPickerModal").classList.add("hidden");
         updateProviderUiMeta(targetProvider);
       });
     });
 
-    inputBaseUrl.addEventListener("input", () => syncActiveEndpointChip(inputBaseUrl.value.trim()));
+    inputBaseUrl.addEventListener("input", () => {
+      const val = inputBaseUrl.value.trim();
+      syncActiveEndpointChip(val);
+      syncVertexPriorityUi(appState.aiConfig.provider || "deepseek", val);
+      syncApiKeyGuideUi(appState.aiConfig.provider || "deepseek", val);
+    });
     inputModel.addEventListener("input", () => syncActiveModelChip(inputModel.value.trim()));
 
     document.getElementById("btnToggleApiKey").addEventListener("click", () => {
@@ -271,20 +451,47 @@
 
     document.getElementById("btnSaveAI").addEventListener("click", async () => {
       const curProvider = appState.aiConfig.provider || "deepseek";
+      const baseUrl = inputBaseUrl.value.trim();
+      const apiKey = inputApiKey.value.trim();
+      const model = inputModel.value.trim();
+      let vertexPriority =
+        curProvider === "gemini" && chkVertexPriority ? Boolean(chkVertexPriority.checked) : false;
+
+      if (vertexPriority && MarkFlowEngine.isVertexAiUrl(baseUrl)) {
+        const permitted = await ensureVertexPriorityPermissionForUrl(baseUrl);
+        if (!permitted) {
+          if (chkVertexPriority) chkVertexPriority.checked = false;
+          vertexPriority = false;
+          if (appState.aiConfig.providers.gemini) {
+            appState.aiConfig.providers.gemini.vertexPriority = false;
+          }
+          syncVertexPriorityActiveHint();
+          return;
+        }
+      }
+
       appState.aiConfig.enabled = chkAiEnabled.checked;
 
       if (!appState.aiConfig.providers) appState.aiConfig.providers = {};
       appState.aiConfig.providers[curProvider] = {
-        baseUrl: inputBaseUrl.value.trim(),
-        apiKey: inputApiKey.value.trim(),
-        model: inputModel.value.trim()
+        baseUrl,
+        apiKey,
+        model,
+        vertexPriority
       };
 
-      appState.aiConfig.baseUrl = inputBaseUrl.value.trim();
-      appState.aiConfig.apiKey = inputApiKey.value.trim();
-      appState.aiConfig.model = inputModel.value.trim();
+      appState.aiConfig.baseUrl = baseUrl;
+      appState.aiConfig.apiKey = apiKey;
+      appState.aiConfig.model = model;
+      appState.aiConfig.vertexPriority = vertexPriority;
 
       await chrome.storage.local.set({ aiConfig: appState.aiConfig });
+      appState.savedGeminiVertexPriority = Boolean(
+        appState.aiConfig.providers.gemini && appState.aiConfig.providers.gemini.vertexPriority
+      );
+      if (!appState.savedGeminiVertexPriority) {
+        await revokeAllVertexPriorityPermissions();
+      }
       if (ctx.updateReorgTokenEstimate) ctx.updateReorgTokenEstimate();
       showToast(t("ai_toast_saved"));
     });
@@ -294,10 +501,28 @@
       const baseUrl = inputBaseUrl.value.trim();
       const apiKey = inputApiKey.value.trim();
       const model = inputModel.value.trim();
+      const useVertexPriority = Boolean(
+        provider === "gemini" &&
+          MarkFlowEngine.isVertexAiUrl(baseUrl) &&
+          chkVertexPriority &&
+          chkVertexPriority.checked
+      );
 
       if (!baseUrl || !model || (!apiKey && provider !== "ollama")) {
         showToast(t("ai_toast_need_all"), true);
         return;
+      }
+
+      if (useVertexPriority) {
+        const permitted = await ensureVertexPriorityPermissionForUrl(baseUrl);
+        if (!permitted) {
+          if (chkVertexPriority) chkVertexPriority.checked = false;
+          if (appState.aiConfig.providers.gemini) {
+            appState.aiConfig.providers.gemini.vertexPriority = false;
+          }
+          syncVertexPriorityActiveHint();
+          return;
+        }
       }
 
       const testBtn = document.getElementById("btnTestAI");
@@ -305,8 +530,22 @@
       testBtn.querySelector("span").textContent = t("btn_test_ai_loading");
 
       try {
-        await MarkFlowEngine.testAIConnection({ provider, baseUrl, apiKey, model });
-        showToast(t("ai_toast_test_ok"));
+        let trafficType = "";
+        await MarkFlowEngine.testAIConnection({
+          provider,
+          baseUrl,
+          apiKey,
+          model,
+          vertexPriority: useVertexPriority,
+          onMeta: meta => {
+            trafficType = (meta && meta.trafficType) || "";
+          }
+        });
+        if (useVertexPriority && trafficType === "ON_DEMAND_PRIORITY") {
+          showToast(t("ai_toast_test_ok_priority"));
+        } else {
+          showToast(t("ai_toast_test_ok"));
+        }
       } catch (err) {
         showToast(t("ai_toast_test_err", { msg: formatFriendlyAiError(err) }), true);
       } finally {
@@ -314,6 +553,162 @@
         testBtn.querySelector("span").textContent = t("btn_test_ai");
       }
     });
+  }
+
+  function resolveApiKeyGuideContext(providerKey, baseUrl) {
+    const preset =
+      MarkFlowEngine.PROVIDER_PRESETS[providerKey] || MarkFlowEngine.PROVIDER_PRESETS.deepseek;
+    const guide = preset && preset.keyGuide;
+    if (!guide) {
+      return { entry: null, displayName: preset ? preset.name : "" };
+    }
+    if (providerKey === "gemini") {
+      if (MarkFlowEngine.isVertexAiUrl(baseUrl)) {
+        if (/\/projects\/[^/]+\/locations\/[^/]+/i.test(baseUrl || "")) {
+          return {
+            entry: guide.vertexProject || guide.vertexExpress || guide.default,
+            displayName: "Vertex AI Project"
+          };
+        }
+        return {
+          entry: guide.vertexExpress || guide.default,
+          displayName: "Vertex AI Express"
+        };
+      }
+      return { entry: guide.default, displayName: "Gemini API" };
+    }
+    return { entry: guide, displayName: preset.name };
+  }
+
+  /** 将包含反引号代码片段的指引文本安全渲染为普通文本与等宽高亮/可复制芯片 */
+  function appendFormattedGuideText(container, text) {
+    const parts = String(text || "").split(/(`[^`]+`)/g);
+    for (const part of parts) {
+      if (!part) continue;
+      if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
+        const code = part.slice(1, -1);
+        const isCopyable = /^(?:ollama\s+pull\b|OLLAMA_ORIGINS=)/i.test(code);
+        if (isCopyable) {
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "key-guide-code is-copyable";
+          copyBtn.title = t("ai_guide_copy_hint");
+          copyBtn.textContent = code;
+          copyBtn.addEventListener("click", async () => {
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(code);
+              }
+            } catch (e) {}
+            showToast(t("ai_toast_copied", { text: code }));
+          });
+          container.appendChild(copyBtn);
+        } else {
+          const codeEl = document.createElement("code");
+          codeEl.className = "key-guide-code";
+          codeEl.textContent = code;
+          container.appendChild(codeEl);
+        }
+      } else {
+        container.appendChild(document.createTextNode(part));
+      }
+    }
+  }
+
+  function syncVertexPriorityActiveHint() {
+    const row = document.getElementById("vertexPriorityRow");
+    const chk = document.getElementById("chkVertexPriority");
+    const pill = document.getElementById("vertexPriorityPill");
+    const hintEl = document.getElementById("vertexPriorityActiveHint");
+    const checked = Boolean(chk && chk.checked);
+    const rowVisible = Boolean(row && !row.classList.contains("hidden"));
+    if (pill) pill.classList.toggle("is-active", checked);
+    if (hintEl) hintEl.classList.toggle("hidden", !(rowVisible && checked));
+  }
+
+  function setKeyGuideOpen(open) {
+    const panel = document.getElementById("apiKeyGuidePanel");
+    if (panel) panel.classList.toggle("hidden", !open);
+  }
+
+  function syncVertexPriorityUi(providerKey, baseUrl) {
+    const row = document.getElementById("vertexPriorityRow");
+    if (!row) return;
+    const isGeminiVertex = providerKey === "gemini" && MarkFlowEngine.isVertexAiUrl(baseUrl);
+    row.classList.toggle("hidden", !isGeminiVertex);
+    syncVertexPriorityActiveHint();
+  }
+
+  function syncApiKeyGuideUi(providerKey, baseUrl) {
+    const triggerTextEl = document.getElementById("btnToggleKeyGuideText");
+    const portalEl = document.getElementById("linkGuidePortal");
+    const portalTextEl = document.getElementById("linkGuidePortalText");
+    const titleEl = document.getElementById("apiKeyGuideTitle");
+    const stepsEl = document.getElementById("apiKeyGuideSteps");
+    const { entry, displayName } = resolveApiKeyGuideContext(providerKey, baseUrl);
+
+    if (triggerTextEl) {
+      triggerTextEl.textContent =
+        entry && entry.url
+          ? t(entry.linkLabelKey || "ai_btn_get_key")
+          : t("ai_btn_key_guide");
+    }
+
+    if (portalEl && portalTextEl) {
+      if (entry && entry.url) {
+        portalEl.href = entry.url;
+        portalTextEl.textContent = t(entry.linkLabelKey || "ai_btn_get_key");
+        portalEl.classList.remove("hidden");
+      } else {
+        portalEl.classList.add("hidden");
+      }
+    }
+
+    if (titleEl) {
+      titleEl.textContent = t("ai_guide_panel_title", { name: displayName || "" });
+    }
+
+    if (stepsEl) {
+      stepsEl.innerHTML = "";
+      const rawSteps = entry && entry.stepsKey ? t(entry.stepsKey) : "";
+      const lines = String(rawSteps || "")
+        .split("\n")
+        .map(line => line.replace(/^\d+\.\s*/, "").trim())
+        .filter(Boolean);
+
+      lines.forEach((line, idx) => {
+        const row = document.createElement("div");
+        row.className = "key-guide-step-row";
+        row.setAttribute("role", "listitem");
+
+        const sepIdx = line.indexOf("::");
+        const stepTitle = sepIdx !== -1 ? line.slice(0, sepIdx).trim() : "";
+        const stepBody = sepIdx !== -1 ? line.slice(sepIdx + 2).trim() : line;
+
+        const badge = document.createElement("span");
+        badge.className = "key-guide-step-num";
+        badge.textContent = String(idx + 1);
+        row.appendChild(badge);
+
+        const content = document.createElement("div");
+        content.className = "key-guide-step-content";
+
+        if (stepTitle) {
+          const titleSpan = document.createElement("div");
+          titleSpan.className = "key-guide-step-title";
+          titleSpan.textContent = stepTitle;
+          content.appendChild(titleSpan);
+        }
+
+        const body = document.createElement("p");
+        body.className = "key-guide-step-body";
+        appendFormattedGuideText(body, stepBody);
+        content.appendChild(body);
+
+        row.appendChild(content);
+        stepsEl.appendChild(row);
+      });
+    }
   }
 
   function updateProviderUiMeta(providerKey) {
@@ -350,6 +745,8 @@
           chip.addEventListener("click", () => {
             inputBaseUrl.value = ep.url;
             syncActiveEndpointChip(ep.url);
+            syncVertexPriorityUi(providerKey, ep.url);
+            syncApiKeyGuideUi(providerKey, ep.url);
             const phIdx = ep.url.indexOf("PROJECT_ID");
             if (phIdx !== -1) {
               inputBaseUrl.focus();
@@ -364,6 +761,9 @@
         epContainer.classList.add("hidden");
       }
     }
+
+    syncVertexPriorityUi(providerKey, inputBaseUrl.value.trim());
+    syncApiKeyGuideUi(providerKey, inputBaseUrl.value.trim());
 
     chipsList.innerHTML = "";
     if (preset.quickModels && preset.quickModels.length > 0) {

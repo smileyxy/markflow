@@ -59,6 +59,7 @@ const DEFAULT_SETTINGS = {
     apiKey: "",
     baseUrl: "https://api.deepseek.com/v1",
     model: "deepseek-flash",
+    vertexPriority: false,
     autoCleanTitle: true,
     temperature: 0
   },

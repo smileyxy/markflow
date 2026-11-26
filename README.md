@@ -8,13 +8,15 @@
 
 **English** · **[简体中文](README.zh-CN.md)**
 
+[![Official Website](https://img.shields.io/badge/Website-markflow.smileyxy.dpdns.org-5B5BD6?style=flat-square)](https://markflow.smileyxy.dpdns.org/)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Install%20Extension-4285F4?style=flat-square&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/iclflcfabddfogenahenikehdnpbhjgm)
+[![Microsoft Edge Add-ons](https://img.shields.io/badge/Edge%20Add--ons-Install%20Extension-0078D7?style=flat-square&logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/gnobhgjnibpaoibjjpnghfmodpkokgll)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-5B5BD6.svg?style=flat-square)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-12805C.svg?style=flat-square)](manifest.json)
 [![Zero Build](https://img.shields.io/badge/Architecture-Zero%20Build%20%7C%20Vanilla%20ES6-64748B.svg?style=flat-square)](#project-structure)
 [![i18n](https://img.shields.io/badge/i18n-7%20Languages-0EA5E9.svg?style=flat-square)](#multi-language-support)
 
-[Screenshots](#-screenshots) · [Features](#-core-features) · [Installation](#-installation) · [AI Providers](#-supported-ai-providers) · [Shortcuts](#-keyboard-shortcuts) · [Privacy](#-privacy--local-first-architecture) · [License](#-license)
+[Website](https://markflow.smileyxy.dpdns.org/) · [Screenshots](#-screenshots) · [Features](#-core-features) · [Installation](#-installation) · [AI Providers](#-supported-ai-providers) · [Shortcuts](#-keyboard-shortcuts) · [Privacy](#-privacy--local-first-architecture) · [License](#-license)
 
 </div>
 
@@ -67,14 +69,18 @@ Browser bookmark bars quickly turn into unsearchable clutter: bloated SEO page t
 
 ## 🚀 Core Features
 
-### 1. Smart Reorganizer & Taxonomy Architect
-- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and sorting inside each folder with **5 sort rules** (*Smart Priority Tiered*, *Site Domain & Port*, *Title A → Z*, *Newest First*, *Oldest First*), a **Changed-Only Preview & Apply** toggle, and a **compact single-row preview table** with domain ellipsis.
+### 1. Smart Reorganizer, Library Cleaner & Taxonomy Architect
+- **Stage-Focused Workspace, Multi-Folder Scope & Mid-Run Cancel**: Entering Blueprint or Preview automatically collapses the configuration panel into a single-line summary bar (expandable inline anytime) paired with a compact unified status strip — showing more bookmarks above the fold. When scoping by folder, a **tree-indented multi-folder selector** lets you target multiple folders at once (automatically folding included subfolders and deduplicating overlapping selections). Every long-running AI task or dead-link scan can be canceled mid-flight with `AbortController`, preserving completed batch results while letting you resume unprocessed items later.
+- **Fit Existing Folders & Sort**: Preserves your familiar folders while cleaning titles, relocating misplaced links, and sorting inside each folder with **5 sort rules** (*Smart Priority Tiered*, *Site Domain & Port*, *Title A → Z*, *Newest First*, *Oldest First*), filtered views (*All Changes* / *Organized* / *AI Failed* / *Unprocessed* / *All*), and a **compact single-row preview table** with domain ellipsis.
+- **0-Token Duplicate Merge & Dead Link Cleanup**:
+  - **Duplicate Bookmark Merge**: Pure local URL canonicalization (strips tracking query params like `utm_*`/`spm`/`fbclid`/`vd_source`, normalizes protocol/`www`/trailing slashes, preserves `#hash` by default) with smart deepest-folder/earliest retention, per-group override, and automatic cleanup of emptied folders.
+  - **Dead Link Cleanup**: Automatically skips non-HTTP and private/LAN URLs, supports on-demand temporary host access (immediately revoked after scan/cancel, with `no-cors` fallback if declined), interleaves probes across hosts to avoid per-site burst throttling, verifies `HEAD` failures with HTML `GET`, runs a low-concurrency 22s `GET` second pass on initial timeouts to rescue slow-loading sites while exposing stalled/unreachable hosts, cross-checks bare-domain HTTPS and manual HTTP hosts to separate genuine dead links (`404`/`410`/unreachable, checked by default) from TLS certificate warnings/persistent timeouts/`HTTP 444`/Cloudflare `521`/`5xx` (unchecked for manual review), surfaces zero-extra-request local proxy/network anomaly warnings if multiple global bookmark sites or a high ratio fail, and automatically filters out WAF JS-challenge `521`/auth/rate-limit shields (`401`/`403`/`412`/`429`).
 - **0-Token Quick Sort**: Reorder bookmarks inside existing folders purely locally using your chosen sort rule without any AI calls.
-- **Resilient Partial Retry**: If any batch encounters upstream quota/network errors during reorganization, failed bookmarks stay highlighted (`AI failed`) with a one-click **`Retry Failed (N)`** action so already-succeeded batches never re-spend tokens.
+- **Resilient Partial Retry**: If any batch encounters upstream quota/network errors during reorganization, failed bookmarks stay separated from succeeded items with a one-click **`Retry Failed (N)`** action and dedicated filter tab so already-succeeded batches never re-spend tokens.
 - **Two-Stage Full Rebuild**:
-  1. **Blueprint Review**: AI proposes a two-level folder hierarchy with **5 visual folder styles** (Semantic Icons, Dual Icons, Plain Text, Numbered `01`, Minimal Symbol `◆`) where you can lock existing folders, rename nodes, or add/remove subfolders;
+  1. **Blueprint Review**: AI proposes a two-level folder hierarchy with **5 visual folder styles** (Semantic Icons, Dual Icons, Plain Text, Numbered `01`, Minimal Symbol `◆`) where you can lock existing folders cleanly in a multi-select popover, rename nodes, or add/remove subfolders;
   2. **Atomic Migration**: Bulk-maps bookmarks (with a real-time **local Token Estimator** before running), folds single-item orphan subfolders, sorts every destination folder, and safely removes empty legacy folders.
-- **Dual Backup Safety**: Export a standard Netscape HTML backup anytime with one click, plus automatic timestamped HTML backup downloads before applying any bulk changes.
+- **Dual Backup Safety**: Export a standard Netscape HTML backup anytime with one click, plus automatic timestamped HTML backup downloads before applying any bulk changes or deletions.
 
 ### 2. Local Rule Engine
 - Matches by **bare domain** (automatically handles nested subdomains and custom ports), **wildcards** (`*github.com*`), or **regular expressions** (`/docs\..+\.dev/i`), supporting multiple separators (`|`, commas, newlines).
@@ -96,14 +102,14 @@ Full localized UI & extension metadata across **7 languages**:
 
 ## 🤖 Supported AI Providers
 
-Each provider stores its Base URL, credential, and model ID independently, with one-click live `/models` fetching inside a centered **Master-Detail Model Picker** featuring normalized vendor badges (`Pro` / `Free` / `LoRA` / `Preview` / `Reasoning`), dynamic generation grouping, live search, and Vertex AI custom `:countTokens` verification:
+Each provider stores its Base URL, credential, and model ID independently, includes a **one-click API Key link + collapsible setup guide**, and supports live `/models` fetching inside a centered **Master-Detail Model Picker** featuring normalized vendor badges (`Pro` / `Free` / `LoRA` / `Preview` / `Reasoning`), dynamic generation grouping, live search, and Vertex AI custom `:countTokens` verification:
 
 | Provider | Protocol | Recommended Models | Notes |
 | :--- | :--- | :--- | :--- |
 | **DeepSeek** | OpenAI Compatible | `deepseek-v4-pro` / `deepseek-flash` | Default preset; fast technical & multilingual classification |
 | **SiliconFlow** | OpenAI Compatible | `DeepSeek-V4.1-Flash` / `GLM-5.3-Flash` / `Qwen3.5-35B-A3B` | Fast OpenAI-compatible hosting across DeepSeek V4, GLM-5.3 & Qwen3.5 |
 | **OpenRouter** | OpenAI Compatible | `google/gemini-4-hydrogen` / `deepseek/deepseek-v4.1-flash` / `anthropic/claude-haiku-5.5` | Unified gateway across 100+ models grouped by normalized vendor |
-| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-3.8-flash` | Presets for Gemini API & Vertex AI with automatic Gemini 4 `locations/global` routing, free `:countTokens` probing & custom model verification |
+| **Google Gemini & Vertex AI** | Gemini `v1beta` · Vertex AI Express · Vertex AI Project | `gemini-4-carbon` / `gemini-4-hydrogen` / `gemini-3.8-flash` | Presets for Gemini API & Vertex AI with automatic Gemini 4 `locations/global` routing, free `:countTokens` probing, custom model verification & opt-in **Vertex AI Priority PayGo** mode |
 | **Claude (Anthropic)** | Anthropic Messages (`/v1/messages`) | `claude-opus-5-5` / `claude-haiku-5-5` / `claude-sonnet-5-5` | Native browser-direct CORS Messages API support |
 | **OpenAI** | OpenAI Compatible | `gpt-6.2-astra` / `gpt-6.2-sol` / `gpt-6-luna` | Standard global OpenAI endpoint |
 | **Grok (xAI)** | OpenAI Compatible | `grok-4.7` / `grok-4.7-fast` / `grok-4.3` | Official xAI API endpoint |
@@ -114,10 +120,10 @@ Each provider stores its Base URL, credential, and model ID independently, with 
 
 ## ⚡ Installation
 
-### Option 1: Chrome Web Store (Recommended)
-Install directly with automatic updates from the official Chrome Web Store listing:
+### Option 1: Chrome Web Store / Microsoft Edge Add-ons (Recommended)
+Install directly with automatic updates from the official extension stores:
 
-👉 **[Install MarkFlow AI from Chrome Web Store](https://chromewebstore.google.com/detail/iclflcfabddfogenahenikehdnpbhjgm)**
+👉 **[Install MarkFlow AI from Chrome Web Store](https://chromewebstore.google.com/detail/iclflcfabddfogenahenikehdnpbhjgm)** · **[Install from Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/gnobhgjnibpaoibjjpnghfmodpkokgll)** · **[Official Website](https://markflow.smileyxy.dpdns.org/)**
 
 ### Option 2: GitHub Releases
 1. Download the latest `markflow-v*.zip` from [GitHub Releases](https://github.com/smileyxy/markflow/releases) and extract it locally.
@@ -149,11 +155,11 @@ Enable **Developer mode** at `chrome://extensions/` and click **Load unpacked** 
 
 ## 🔒 Privacy & Local-First Architecture
 
-MarkFlow AI is designed strictly **Local-First & Zero-Server**, adhering to Chrome Web Store Privacy and Limited Use policies (see [PRIVACY.md](PRIVACY.md)):
+MarkFlow AI is designed strictly **Local-First & Zero-Server**, adhering to Chrome Web Store and Microsoft Edge Add-ons Privacy and Limited Use policies (see [PRIVACY.md](PRIVACY.md) or [Online Privacy Policy](https://markflow.smileyxy.dpdns.org/privacy)):
 
-- **Zero Servers & Zero Telemetry**: No developer backend, no accounts, and no analytics/tracking SDKs. Bookmarks stay in Chrome's native bookmark tree with standard Chrome Sync compatibility.
+- **Zero Servers & Zero Telemetry**: No developer backend, no accounts, and no analytics/tracking SDKs. Bookmarks stay in your browser's native bookmark tree with standard browser Sync compatibility.
 - **Keys Stay Local**: API keys are stored solely in your browser's `chrome.storage.local` and sent directly to your configured AI endpoint or local Ollama instance.
-- **Minimal On-Demand Permissions**: Page metadata is only read when you deliberately trigger bookmark capture (and can be disabled anytime in **Preferences**).
+- **Minimal On-Demand Permissions**: Installs with **zero required `host_permissions`**. Page metadata is only read when you deliberately trigger bookmark capture (and can be disabled anytime in **Preferences**). `optional_host_permissions` covers strictly opt-in actions: (1) official Vertex AI endpoints (`aiplatform.googleapis.com` / `us-aiplatform.googleapis.com` / `eu-aiplatform.googleapis.com`) requested one host at a time when enabling **Vertex AI Priority** mode, and (2) temporary `https://*/*` / `http://*/*` access requested solely during **Dead Link Scan** (sending credential-free local `HEAD`/`GET` probes and auto-revoked via `chrome.permissions.remove` immediately upon completion or cancellation).
 
 ---
 
@@ -167,10 +173,12 @@ markflow/
 │   └── service-worker.js     # Lifecycle defaults & storage initialization
 ├── shared/                   # Zero-dependency modular core engine
 │   ├── constants.js          # Provider presets, multi-topic domains, default rules
+│   ├── platform.js           # Chromium / Edge root-folder compatibility adapter
 │   ├── utils.js              # Title cleaner, Pangu spacing, helpers
 │   ├── tree.js               # Bookmark tree analyzer & blueprint orphan folding
 │   ├── rules.js              # Local rule engine (domain / wildcard / regex)
 │   ├── sorter.js             # 3-tier priority sorter & deterministic insertion index
+│   ├── cleaner.js            # 0-Token URL dedup & cancellable dead link scanner
 │   ├── llm.js                # Unified Gemini API / Vertex AI / OpenAI client
 │   ├── classifier.js         # Single & batch semantic classification orchestrator
 │   ├── i18n.js               # Dynamic 7-language i18n runtime

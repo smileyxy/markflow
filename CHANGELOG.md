@@ -4,6 +4,31 @@ All notable changes to **MarkFlow AI** will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-26
+
+### 🚀 Highlights / 核心亮点
+- 🧹 **0-Token Duplicate Merge & Dead Link Cleanup (`shared/cleaner.js`)** — Added local URL canonicalization (tracking-param stripping, smart deepest/earliest retention, emptied-folder cleanup) and a cancellable Dead Link Scanner with on-demand temporary host access (auto-revoked immediately via `chrome.permissions.remove`), adaptive two-phase 22s `GET` timeout recovery, WAF JS-challenge filtering, zero-extra-request proxy anomaly detection, and clear separation of high-confidence dead vs. manual review / 新增纯本地 0 Token 重复书签合并与失效链接清理引擎：按需申请临时主机权限并在完成或取消后自动撤销，支持首轮超时低并发 `GET` 复测、WAF 拦截过滤、零外发代理异常识别与高置信失效/人工复核分级。
+- 🗂️ **Stage-Focused Reorganizer & Tree Multi-Folder Scope Picker** — Reworked Smart Reorganize with a collapsible single-line summary bar (refresh action icon), mid-run `AbortController` cancellation & resume, segmented scope switch paired with a tree-indented multi-folder selector (auto parent-child inclusion dimming & ID deduplication), compact locked-folder popover, unified neutral estimate pill, and matte action buttons / 智能整理升级为阶段聚焦折叠摘要栏与环形刷新入口，支持全流程随时取消与继续、分段范围切换 + 树形缩进多选目标文件夹（父目录自动包含并去重）、锁定目录多选浮层与统一克制配色的估算胶囊和哑光主按钮。
+- 🔑 **Vertex AI Priority PayGo & One-Click Provider Key Guides** — Added opt-in per-host `optional_host_permissions` Vertex AI Priority PayGo routing alongside built-in official API Key links and 3-step setup guides for all 9 providers / 支持按需单域名授权启用 Vertex AI Priority 优先模式，并内置 9 大服务商一键获取 API Key 入口与 3 步指引弹窗。
+- 🌐 **Microsoft Edge Add-ons Support & Unified Vector Icons** — Added cross-browser platform abstraction (`shared/platform.js`), neutral 7-language UI copy (`500 keys/locale`), dual-store `PRIVACY.md`, unified vector-ratio icons (`icon16`–`icon128`), and isolated Edge CI deployment / 全面适配 Microsoft Edge 扩展体系与中性化 7 语种文案（每语种 500 词条），重绘统一粗细比例的扩展图标与商店徽标，并上线独立 Edge 自动化发版流水线。
+
+### 🆕 Added / 新增
+- Add 0-Token Duplicate Bookmark Merge (`clean_dup_*` / `findDuplicateBookmarkGroups`) with URL tracking-parameter normalization (`utm_*`, `spm`, `fbclid`, `vd_source`), optional `#hash` folding, and empty ancestor folder pruning / 新增 0 Token 重复书签合并、追踪参数清理、可切换锚点保留及删空目录清理
+- Add 0-Token Dead Link Cleaner (`probeSingleBookmarkLink`, `scanDeadBookmarks`, `detectDeadLinkProxyAnomaly`) with on-demand `https://*/*` & `http://*/*` permission acquisition/revocation (`no-cors` fallback when declined), host-interleaved concurrency, and proxy anomaly warning banner / 新增 0 Token 失效链接探测引擎、按需临时权限自动回收与本地代理异常顶部提示条
+- Add collapsible `#reorgConfigSummaryBar`, mid-run `AbortController` task cancellation, tree-indented `#scopeFoldersDropdown` multi-folder scope selector, and `#lockedFoldersDropdown` multi-select lock popover / 新增折叠配置摘要栏、随时取消任务控制、树形多选目标文件夹与锁定目录浮层
+- Add `#btnKeyGuide` / `#apiKeyGuidePanel` 3-step BYOK setup modal across all 9 provider presets and opt-in Vertex AI Priority header (`X-Vertex-AI-LLM-Shared-Request-Type: priority`) / 新增服务商 3 步密钥指引弹窗与 Vertex AI Priority 按需授权开关
+- Add `shared/platform.js` Chromium/Edge root-folder adapter and `.github/scripts/publish-edge.js` isolated CI job / 新增跨浏览器目录适配器与独立 Edge 商店发布脚本
+
+### ⚡ Improved / 优化
+- Upgrade Dead Link accuracy by distinguishing `HTTP 444`, Cloudflare `521` vs. non-Cloudflare WAF JS-challenge `521`, bare-domain HTTPS vs. missing `www.` redirects, manual HTTP TLS/cert checks, and `401`/`403`/`412`/`429` anti-bot shields / 精细区分 `HTTP 444`、Cloudflare 与 WAF JS 质询 `521`、裸域与证书异常，自动过滤防爬与登录拦截状态
+- Refresh Smart Reorganize styling with unified monochrome/accent neutral estimate pill (`.token-estimate-pill`), matte ink action buttons (`.btn-ink` / `.btn-emerald`), and circular refresh icon on `#btnSummaryRerun` / 统一智能整理视觉规范：中性低饱和估算胶囊、哑光深墨主按钮与摘要栏标准环形刷新图标
+- Re-render `icons/icon{16,32,48,128}.png` and store emblems from a unified SVG stroke geometry for consistent crispness at every DPI / 统一重绘全尺寸应用图标与双商店徽标，确保不同缩放下线条比例协调锐利
+- Update bilingual `README.md`, `README.zh-CN.md`, and `PRIVACY.md` for dual-store compliance and transparent opt-in host permissions disclosure / 同步双语文档与 `PRIVACY.md`，完整披露按需权限边界与纯本地检测机制
+
+### 🐞 Fixed / 修复
+- Fix Edge Store incompatibility from hardcoded Chrome-only root labels, third-party vendor/browser mentions in store text, and fragile single-section CHANGELOG parsing in CI / 修复 Edge 根目录兼容、商店描述中性化及 CI 多章节变更日志截取问题
+- Prevent duplicate bookmark counting or processing when parent and descendant folders are simultaneously within selected scope / 防止多选目标文件夹包含父子目录时重复统计或重复处理同一书签
+
 ## [1.1.0] - 2026-11-24
 
 ### 🚀 Highlights / 核心亮点
